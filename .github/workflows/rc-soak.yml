@@ -122,7 +122,9 @@ jobs:
             if [ -n "$PERF_LINE" ]; then DESC=$(printf 'Perf %s' "$PERF_LINE" | cut -c1-140); fi
             publish_status success "ci/perf" "$DESC"
           elif [ "$FUNCTIONAL_EXIT" = "0" ]; then
-            publish_status failure "ci/perf" "Stress300 Chromium baseline failed"
+            DESC="Stress300 Chromium baseline failed"
+            if [ -n "$PERF_LINE" ]; then DESC=$(printf 'Perf FAIL %s' "$PERF_LINE" | cut -c1-140); fi
+            publish_status failure "ci/perf" "$DESC"
           else
             publish_status error "ci/perf" "Skipped because checkpoint soak failed"
           fi
