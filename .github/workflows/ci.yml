@@ -56,22 +56,48 @@ jobs:
           if [ "$EXIT_CODE" -ne 0 ]; then
             TEST_LINE=$(grep -E '^[[:space:]]*[0-9]+\)' smoke.log | head -n 1 | tr -d '\r\n' | cut -c1-150)
             DETAIL_LINE=$(grep -E 'Error:|Expected:|Received:|Timeout|pageerror:|console:' smoke.log | head -n 1 | tr -d '\r\n' | cut -c1-150)
-            if [ -n "$TEST_LINE" ] && [ -n "$DETAIL_LINE" ]; then
-              ERROR_LINE="$TEST_LINE :: $DETAIL_LINE"
-            elif [ -n "$TEST_LINE" ]; then
-              ERROR_LINE="$TEST_LINE"
-            elif [ -n "$DETAIL_LINE" ]; then
-              ERROR_LINE="$DETAIL_LINE"
-            else
-              ERROR_LINE=$(tail -n 3 smoke.log | tr '\n' ' ' | tr -d '\r' | cut -c1-180)
-            fi
+            if [ -n "$TEST_LINE" ] && [ -n "$DETAIL_LINE" ]; then ERROR_LINE="$TEST_LINE :: $DETAIL_LINE";
+            elif [ -n "$TEST_LINE" ]; then ERROR_LINE="$TEST_LINE";
+            elif [ -n "$DETAIL_LINE" ]; then ERROR_LINE="$DETAIL_LINE";
+            else ERROR_LINE=$(tail -n 3 smoke.log | tr '\n' ' ' | tr -d '\r' | cut -c1-180); fi
             echo "error_line=$ERROR_LINE" >> "$GITHUB_OUTPUT"
           fi
           exit 0
 
+      - name: RC soak and stress baseline
+        if: steps.build.outputs.exit_code == '0' && steps.smoke.outputs.exit_code == '0'
+        id: soak
+        shell: bash
+        run: |
+          set +e
+          npm run soak 2>&1 | tee soak.log
+          EXIT_CODE=${PIPESTATUS[0]}
+          echo "exit_code=$EXIT_CODE" >> "$GITHUB_OUTPUT"
+          PERF_LINE=$(grep 'RC_PERF ' soak.log | tail -n 1 | sed 's/^.*RC_PERF //' | tr -d '\r\n' | cut -c1-180)
+          if [ -n "$PERF_LINE" ]; then echo "perf_line=$PERF_LINE" >> "$GITHUB_OUTPUT"; fi
+          if [ "$EXIT_CODE" -ne 0 ]; then
+            TEST_LINE=$(grep -E '^[[:space:]]*[0-9]+\)' soak.log | head -n 1 | tr -d '\r\n' | cut -c1-150)
+            DETAIL_LINE=$(grep -E 'Error:|Expected:|Received:|Timeout|Autoplay run ended|toBeGreaterThan' soak.log | head -n 1 | tr -d '\r\n' | cut -c1-150)
+            if [ -n "$TEST_LINE" ] && [ -n "$DETAIL_LINE" ]; then ERROR_LINE="$TEST_LINE :: $DETAIL_LINE";
+            elif [ -n "$TEST_LINE" ]; then ERROR_LINE="$TEST_LINE";
+            elif [ -n "$DETAIL_LINE" ]; then ERROR_LINE="$DETAIL_LINE";
+            else ERROR_LINE=$(tail -n 3 soak.log | tr '\n' ' ' | tr -d '\r' | cut -c1-180); fi
+            echo "error_line=$ERROR_LINE" >> "$GITHUB_OUTPUT"
+          fi
+          exit 0
+
+      - name: Upload RC playtest metrics
+        if: always() && steps.build.outputs.exit_code == '0' && steps.smoke.outputs.exit_code == '0'
+        uses: actions/upload-artifact@v7
+        with:
+          name: rogue-defense-v0.1-rc1-playtest-metrics
+          path: test-results/rc-perf.json
+          if-no-files-found: warn
+          retention-days: 14
+
       - name: Upload validated web RC
         id: artifact
-        if: steps.build.outputs.exit_code == '0' && steps.smoke.outputs.exit_code == '0'
+        if: steps.build.outputs.exit_code == '0' && steps.smoke.outputs.exit_code == '0' && steps.soak.outputs.exit_code == '0'
         uses: actions/upload-artifact@v7
         with:
           name: rogue-defense-v0.1-rc1-web
@@ -89,6 +115,9 @@ jobs:
           BUILD_ERROR: ${{ steps.build.outputs.error_line }}
           SMOKE_EXIT: ${{ steps.smoke.outputs.exit_code }}
           SMOKE_ERROR: ${{ steps.smoke.outputs.error_line }}
+          SOAK_EXIT: ${{ steps.soak.outputs.exit_code }}
+          SOAK_ERROR: ${{ steps.soak.outputs.error_line }}
+          PERF_LINE: ${{ steps.soak.outputs.perf_line }}
           ARTIFACT_OUTCOME: ${{ steps.artifact.outcome }}
         run: |
           publish_status() {
@@ -104,35 +133,23 @@ jobs:
               -d "{\"state\":\"$state\",\"context\":\"$context\",\"description\":\"$description\"}"
           }
 
-          if [ "$BUILD_EXIT" = "0" ]; then
-            publish_status success "ci/build" "Rogue Defense TypeScript + Vite build"
-          else
-            publish_status failure "ci/build" "Rogue Defense TypeScript + Vite build"
-          fi
-
-          if [ "$BUILD_EXIT" = "0" ] && [ "$SMOKE_EXIT" = "0" ]; then
-            publish_status success "ci/smoke" "Chromium V0.1 RC browser smoke"
-          elif [ "$BUILD_EXIT" = "0" ]; then
-            publish_status failure "ci/smoke" "Chromium V0.1 RC browser smoke"
-          else
-            publish_status error "ci/smoke" "Skipped because build failed"
-          fi
-
-          if [ "$ARTIFACT_OUTCOME" = "success" ]; then
-            publish_status success "ci/artifact" "V0.1 RC dist artifact uploaded"
-          elif [ "$BUILD_EXIT" = "0" ] && [ "$SMOKE_EXIT" = "0" ]; then
-            publish_status failure "ci/artifact" "V0.1 RC artifact upload failed"
-          else
-            publish_status error "ci/artifact" "Skipped because validation failed"
-          fi
+          if [ "$BUILD_EXIT" = "0" ]; then publish_status success "ci/build" "Rogue Defense TypeScript + Vite build"; else publish_status failure "ci/build" "Rogue Defense TypeScript + Vite build"; fi
+          if [ "$BUILD_EXIT" = "0" ] && [ "$SMOKE_EXIT" = "0" ]; then publish_status success "ci/smoke" "Chromium V0.1 RC browser smoke"; elif [ "$BUILD_EXIT" = "0" ]; then publish_status failure "ci/smoke" "Chromium V0.1 RC browser smoke"; else publish_status error "ci/smoke" "Skipped because build failed"; fi
+          if [ "$BUILD_EXIT" = "0" ] && [ "$SMOKE_EXIT" = "0" ] && [ "$SOAK_EXIT" = "0" ]; then
+            DESC="Accelerated W1-W101 soak + Stress300 passed"
+            if [ -n "$PERF_LINE" ]; then DESC=$(printf 'Soak passed; perf %s' "$PERF_LINE" | cut -c1-140); fi
+            publish_status success "ci/soak" "$DESC"
+          elif [ "$BUILD_EXIT" = "0" ] && [ "$SMOKE_EXIT" = "0" ]; then publish_status failure "ci/soak" "RC soak or Stress300 baseline failed"; else publish_status error "ci/soak" "Skipped because prior validation failed"; fi
+          if [ "$ARTIFACT_OUTCOME" = "success" ]; then publish_status success "ci/artifact" "V0.1 RC dist artifact uploaded"; elif [ "$SOAK_EXIT" = "0" ]; then publish_status failure "ci/artifact" "V0.1 RC artifact upload failed"; else publish_status error "ci/artifact" "Skipped because validation failed"; fi
 
           ERROR_LINE="$BUILD_ERROR"
           if [ -z "$ERROR_LINE" ]; then ERROR_LINE="$SMOKE_ERROR"; fi
+          if [ -z "$ERROR_LINE" ]; then ERROR_LINE="$SOAK_ERROR"; fi
           if [ -n "$ERROR_LINE" ]; then
             SAFE=$(printf '%s' "$ERROR_LINE" | sed 's/[^A-Za-z0-9_.:()\/ -]/_/g' | cut -c1-180)
             publish_status failure "ci/error: $SAFE" "Latest CI error summary"
           fi
 
       - name: Fail job when validation failed
-        if: steps.build.outputs.exit_code != '0' || steps.smoke.outputs.exit_code != '0' || steps.artifact.outcome != 'success'
+        if: steps.build.outputs.exit_code != '0' || steps.smoke.outputs.exit_code != '0' || steps.soak.outputs.exit_code != '0' || steps.artifact.outcome != 'success'
         run: exit 1
