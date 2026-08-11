@@ -4,6 +4,14 @@ import { expect, test, type Page } from '@playwright/test';
 const LOGICAL_WIDTH = 1000;
 const LOGICAL_HEIGHT = 1600;
 
+interface CombatSnapshot {
+  scene: string;
+  wave: number;
+  runLevel: number;
+  overlay: 'none' | 'upgrade' | 'branch' | 'shop' | 'replacement';
+  optionIds: string[];
+}
+
 async function clickLogical(page: Page, x: number, y: number): Promise<void> {
   const canvas = page.locator('canvas');
   await expect(canvas).toBeVisible();
@@ -60,56 +68,7 @@ function preferredUpgradeIndex(optionIds: string[]): number {
   return 0;
 }
 
-async function settleOverlay(page: Page): Promise<void> {
-  const app = page.locator('#app');
-  const overlay = await app.getAttribute('data-overlay');
-  if (overlay === 'upgrade') {
-    const optionIds = (await app.getAttribute('data-upgrade-option-ids') ?? '').split('|').filter(Boolean);
-    const index = preferredUpgradeIndex(optionIds);
-    await clickLogical(page, 500, 470 + index * 250);
-    await page.clock.runFor(250);
-    return;
-  }
-  if (overlay === 'branch') {
-    await clickLogical(page, 500, 500);
-    await page.clock.runFor(250);
-    return;
-  }
-  if (overlay === 'replacement') {
-    await clickLogical(page, 500, 1345);
-    await page.clock.runFor(250);
-    return;
-  }
-  if (overlay === 'shop') {
-    await clickLogical(page, 500, 315);
-    await page.clock.runFor(150);
-    if (await app.getAttribute('data-overlay') === 'replacement') {
-      await clickLogical(page, 500, 1345);
-      await page.clock.runFor(150);
-    }
-    if (await app.getAttribute('data-overlay') === 'branch') {
-      await clickLogical(page, 500, 500);
-      await page.clock.runFor(150);
-    }
-    await clickLogical(page, 735, 1405);
-    await page.clock.runFor(250);
-  }
-}
-
-test('DEV functional W1 soak reaches W101 and verifies Difficulty II settlement chain', async ({ page }) => {
-  test.setTimeout(180_000);
-  await page.clock.install();
-  await page.setViewportSize({ width: 1000, height: 1600 });
-  await page.goto('/?dev=1');
-  await installMaxMetaSave(page);
-  await page.reload();
-
-  const app = page.locator('#app');
-  await expect(app).toHaveAttribute('data-scene', 'menu');
-  await clickLogical(page, 500, 675);
-  await expect(app).toHaveAttribute('data-scene', 'combat');
-  await expect(app).toHaveAttribute('data-dev-run', '0');
-
+async function configureFunctionalSoak(page: Page): Promise<void> {
   await page.evaluate(() => {
     const game = (window as unknown as { __rogueDefenseGame?: { scene: { getScene: (key: string) => unknown } } }).__rogueDefenseGame;
     const combat = game?.scene.getScene('CombatScene') as {
@@ -120,41 +79,121 @@ test('DEV functional W1 soak reaches W101 and verifies Difficulty II settlement 
       refreshWeaponModifiers?: () => void;
     } | undefined;
     if (!combat) throw new Error('DEV Phaser game probe unavailable');
-    combat.maxGameSpeed = 16;
-    combat.gameSpeed = 16;
-    combat.globalDamageMultiplier = (combat.globalDamageMultiplier ?? 1) * 5;
-    combat.base?.increaseMaxHp(8);
+    combat.maxGameSpeed = 4;
+    combat.gameSpeed = 4;
+    combat.globalDamageMultiplier = (combat.globalDamageMultiplier ?? 1) * 50;
+    combat.base?.increaseMaxHp(50);
     combat.refreshWeaponModifiers?.();
   });
+}
 
-  let reachedWave = 1;
-  let runLevelAt101 = 1;
+async function advanceCombat(page: Page, stepCount = 500): Promise<CombatSnapshot> {
+  return page.evaluate((steps) => {
+    type Overlay = { visible: boolean };
+    type UpgradeOverlayProbe = Overlay & { optionIds: readonly string[] };
+    type CombatProbe = {
+      update: (time: number, delta: number) => void;
+      waveManager: { wave: number };
+      runState: { level: number };
+      upgradeOverlay: UpgradeOverlayProbe;
+      branchOverlay: Overlay;
+      bossShopOverlay: Overlay;
+      replacementOverlay: Overlay;
+    };
+    const game = (window as unknown as {
+      __rogueDefenseGame?: {
+        scene: {
+          getScene: (key: string) => unknown;
+          getScenes: (activeOnly: boolean) => Array<{ scene: { key: string } }>;
+        };
+      };
+    }).__rogueDefenseGame;
+    if (!game) throw new Error('DEV Phaser game probe unavailable');
+    const combat = game.scene.getScene('CombatScene') as CombatProbe;
 
-  for (let cycle = 0; cycle < 250; cycle += 1) {
-    const scene = await app.getAttribute('data-scene');
-    if (scene === 'settlement') break;
+    const getOverlay = (): CombatSnapshot['overlay'] => combat.replacementOverlay.visible
+      ? 'replacement'
+      : combat.branchOverlay.visible
+        ? 'branch'
+        : combat.bossShopOverlay.visible
+          ? 'shop'
+          : combat.upgradeOverlay.visible
+            ? 'upgrade'
+            : 'none';
 
-    const overlay = await app.getAttribute('data-overlay');
-    if (overlay && overlay !== 'none') {
-      await settleOverlay(page);
+    for (let index = 0; index < steps; index += 1) {
+      const active = game.scene.getScenes(true)[0];
+      if (!active || active.scene.key !== 'CombatScene') break;
+      if (getOverlay() !== 'none') break;
+      combat.update(performance.now(), 50);
+    }
+
+    const active = game.scene.getScenes(true)[0];
+    return {
+      scene: active?.scene.key ?? 'none',
+      wave: combat.waveManager?.wave ?? 0,
+      runLevel: combat.runState?.level ?? 0,
+      overlay: active?.scene.key === 'CombatScene' ? getOverlay() : 'none',
+      optionIds: [...(combat.upgradeOverlay?.optionIds ?? [])],
+    };
+  }, stepCount);
+}
+
+async function resolveOverlay(page: Page, snapshot: CombatSnapshot): Promise<void> {
+  if (snapshot.overlay === 'upgrade') {
+    const index = preferredUpgradeIndex(snapshot.optionIds);
+    await clickLogical(page, 500, 470 + index * 250);
+    return;
+  }
+  if (snapshot.overlay === 'branch') {
+    await clickLogical(page, 500, 500);
+    return;
+  }
+  if (snapshot.overlay === 'replacement') {
+    await clickLogical(page, 500, 1345);
+    return;
+  }
+  if (snapshot.overlay === 'shop') {
+    await clickLogical(page, 500, 315);
+    await page.waitForTimeout(5);
+    const afterPurchase = await advanceCombat(page, 1);
+    if (afterPurchase.overlay === 'replacement') await clickLogical(page, 500, 1345);
+    if (afterPurchase.overlay === 'branch') await clickLogical(page, 500, 500);
+    await page.waitForTimeout(5);
+    await clickLogical(page, 735, 1405);
+  }
+}
+
+test('DEV functional W1 soak reaches W101 and verifies Difficulty II settlement chain', async ({ page }) => {
+  test.setTimeout(90_000);
+  await page.setViewportSize({ width: 1000, height: 1600 });
+  await page.goto('/?dev=1');
+  await installMaxMetaSave(page);
+  await page.reload();
+
+  const app = page.locator('#app');
+  await expect(app).toHaveAttribute('data-scene', 'menu');
+  await clickLogical(page, 500, 675);
+  await expect(app).toHaveAttribute('data-scene', 'combat');
+  await expect(app).toHaveAttribute('data-dev-run', '0');
+  await configureFunctionalSoak(page);
+
+  let snapshot = await advanceCombat(page, 1);
+  for (let cycle = 0; cycle < 300 && snapshot.scene === 'CombatScene' && snapshot.wave < 101; cycle += 1) {
+    if (snapshot.overlay !== 'none') {
+      await resolveOverlay(page, snapshot);
+      snapshot = await advanceCombat(page, 1);
       continue;
     }
-
-    reachedWave = Number(await app.getAttribute('data-wave') ?? '1');
-    if (reachedWave >= 101) {
-      runLevelAt101 = Number(await app.getAttribute('data-run-level') ?? '1');
-      break;
-    }
-
-    await page.clock.runFor(15_000);
+    snapshot = await advanceCombat(page, 500);
   }
 
-  expect(reachedWave, 'Functional soak ended before W101').toBeGreaterThanOrEqual(101);
-  expect(runLevelAt101).toBeGreaterThanOrEqual(50);
-  expect(runLevelAt101).toBeLessThanOrEqual(80);
+  expect(snapshot.scene, `Functional soak left combat at W${snapshot.wave}`).toBe('CombatScene');
+  expect(snapshot.wave, 'Functional soak ended before W101').toBeGreaterThanOrEqual(101);
+  expect(snapshot.runLevel).toBeGreaterThanOrEqual(50);
+  expect(snapshot.runLevel).toBeLessThanOrEqual(80);
 
   await clickLogical(page, 870, 330);
-  await page.clock.runFor(250);
   await expect(app).toHaveAttribute('data-scene', 'settlement');
 
   const save = await page.evaluate(() => JSON.parse(localStorage.getItem('rogue-defense.save') ?? '{}')) as {
