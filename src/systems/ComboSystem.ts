@@ -1,26 +1,27 @@
-import type { DamageContext, DamageResult, Targetable } from '../combat/types';
+import type { ComboId, DamageContext, DamageResult, Targetable } from '../combat/types';
 
 export class ComboSystem {
   static resolveAfterHit(target: Targetable, context: DamageContext, result: DamageResult): void {
     if (!target.alive) return;
 
     const tags = new Set(context.tags ?? []);
+    const enabled = new Set<ComboId>(context.enabledCombos ?? []);
 
-    if (tags.has('EXPLOSION')) {
+    if (enabled.has('DETONATION') && tags.has('EXPLOSION')) {
       this.resolveDetonation(target);
       if (!target.alive) return;
     }
 
-    if (tags.has('HEAVY_HIT') && target.hardControlled) {
+    if (enabled.has('CONCUSSIVE_BREAK') && tags.has('HEAVY_HIT') && target.hardControlled) {
       target.applyStatus({ type: 'ARMOR_BREAK', durationMs: 4000, magnitude: 35 });
     }
 
-    if (tags.has('LIGHTNING') && target.hasStatus('CHARGED')) {
+    if (enabled.has('OVERLOAD') && tags.has('LIGHTNING') && target.hasStatus('CHARGED')) {
       this.resolveOverload(target, context, result);
       if (!target.alive) return;
     }
 
-    if (tags.has('SNIPER') && result.critical && target.hardControlled) {
+    if (enabled.has('CONTROL_EXECUTION') && tags.has('SNIPER') && result.critical && target.hardControlled) {
       target.takeDamage(result.finalDamage * 0.75);
     }
   }
