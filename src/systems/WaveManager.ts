@@ -7,20 +7,24 @@ import { WaveDirector, type WaveComposition } from './WaveDirector';
 
 export type SpawnRequest = { kind: EnemyKind; laneIndex: number };
 
+type SpawnPlanEntry = SpawnRequest & { atMs: number };
+type RandomSource = () => number;
+
 export class WaveManager {
   private waveNumber: number;
   private waveElapsedMs = 0;
   private spawnedThisWave = 0;
-  private spawnedHeavyThisWave = 0;
-  private spawnedFlyingThisWave = 0;
   private bossSpawned = false;
   private checkpointClearRequested = false;
   private shopRequestedWave: number | null = null;
   private waitingForShop = false;
-  private laneCursor = 0;
+  private spawnPlanWave = 0;
+  private spawnPlan: SpawnPlanEntry[] = [];
+  private readonly runSeed: number;
 
-  constructor(startWave = 1) {
+  constructor(startWave = 1, seed?: number) {
     this.waveNumber = this.normalizeWave(startWave);
+    this.runSeed = this.normalizeSeed(seed ?? Math.floor(Math.random() * 0x1_0000_0000));
     WaveDirector.setActiveSpawnWave(this.waveNumber);
   }
 
@@ -42,20 +46,17 @@ export class WaveManager {
     if (this.isBossWave) return this.updateBossWave(bossAlive);
 
     const composition = WaveDirector.getRegularComposition(this.waveNumber);
+    this.ensureSpawnPlan(composition);
     const requests: SpawnRequest[] = [];
-    const targetCount = composition.infantry + composition.heavy + composition.flying;
-    const spawnInterval = WAVE_SPAWN_WINDOW_MS / Math.max(1, targetCount);
     this.waveElapsedMs += deltaMs;
+    const spawnCutoffMs = Math.min(this.waveElapsedMs, WAVE_SPAWN_WINDOW_MS);
 
     while (
-      this.spawnedThisWave < targetCount
-      && this.spawnedThisWave * spawnInterval <= Math.min(this.waveElapsedMs, WAVE_SPAWN_WINDOW_MS)
+      this.spawnedThisWave < this.spawnPlan.length
+      && this.spawnPlan[this.spawnedThisWave].atMs <= spawnCutoffMs
     ) {
-      const kind = this.pickSpawnKind(composition, targetCount);
-      requests.push({ kind, laneIndex: this.laneCursor % 5 });
-      if (kind === 'heavy') this.spawnedHeavyThisWave += 1;
-      if (kind === 'flying') this.spawnedFlyingThisWave += 1;
-      this.laneCursor += 1;
+      const entry = this.spawnPlan[this.spawnedThisWave];
+      requests.push({ kind: entry.kind, laneIndex: entry.laneIndex });
       this.spawnedThisWave += 1;
     }
 
@@ -106,9 +107,13 @@ export class WaveManager {
       this.bossSpawned = true;
       const requests: SpawnRequest[] = [{ kind: 'boss', laneIndex: 2 }];
       const escortCount = WaveDirector.getBossEscortCount(this.waveNumber);
+      const random = this.createWaveRandom(this.waveNumber + 100_000);
+      let previousLane = 2;
 
       for (let index = 0; index < escortCount; index += 1) {
-        requests.push({ kind: 'flying', laneIndex: index % 5 });
+        const laneIndex = this.pickLane(random, previousLane);
+        requests.push({ kind: 'flying', laneIndex });
+        previousLane = laneIndex;
       }
       return requests;
     }
@@ -121,36 +126,79 @@ export class WaveManager {
     return [];
   }
 
-  private pickSpawnKind(composition: WaveComposition, targetCount: number): EnemyKind {
-    if (composition.flying > 0 && this.spawnedFlyingThisWave < composition.flying) {
-      const nextFlyingThreshold = Math.round(
-        ((this.spawnedFlyingThisWave + 1) * targetCount) / (composition.flying + 1),
-      );
-      if (this.spawnedThisWave + 1 >= nextFlyingThreshold) return 'flying';
-    }
+  private ensureSpawnPlan(composition: WaveComposition): void {
+    const targetCount = composition.infantry + composition.heavy + composition.flying;
+    if (this.spawnPlanWave === this.waveNumber && this.spawnPlan.length === targetCount) return;
 
-    if (composition.heavy > 0 && this.spawnedHeavyThisWave < composition.heavy) {
-      const nextHeavyThreshold = Math.round(
-        ((this.spawnedHeavyThisWave + 1) * targetCount) / (composition.heavy + 1),
-      );
-      if (this.spawnedThisWave + 1 >= nextHeavyThreshold) return 'heavy';
-    }
+    const random = this.createWaveRandom(this.waveNumber);
+    const kinds: EnemyKind[] = [];
+    for (let index = 0; index < composition.infantry; index += 1) kinds.push('infantry');
+    for (let index = 0; index < composition.heavy; index += 1) kinds.push('heavy');
+    for (let index = 0; index < composition.flying; index += 1) kinds.push('flying');
+    this.shuffle(kinds, random);
 
-    const spawnedInfantry = this.spawnedThisWave - this.spawnedHeavyThisWave - this.spawnedFlyingThisWave;
-    if (spawnedInfantry < composition.infantry) return 'infantry';
-    if (this.spawnedHeavyThisWave < composition.heavy) return 'heavy';
-    if (this.spawnedFlyingThisWave < composition.flying) return 'flying';
-    return 'infantry';
+    const baseIntervalMs = WAVE_SPAWN_WINDOW_MS / Math.max(1, targetCount);
+    const minimumGapMs = Math.min(baseIntervalMs, Math.max(6, baseIntervalMs * 0.18));
+    let previousAtMs = 0;
+    let previousLane = -1;
+
+    this.spawnPlan = kinds.map((kind, index) => {
+      let atMs = 0;
+      if (index > 0) {
+        const nominalAtMs = index * baseIntervalMs;
+        const jitterMs = (random() - 0.5) * baseIntervalMs * 1.5;
+        const remaining = targetCount - index - 1;
+        const latestAtMs = WAVE_SPAWN_WINDOW_MS - remaining * minimumGapMs;
+        atMs = Math.min(
+          latestAtMs,
+          Math.max(previousAtMs + minimumGapMs, nominalAtMs + jitterMs),
+        );
+      }
+
+      const laneIndex = this.pickLane(random, previousLane);
+      previousAtMs = atMs;
+      previousLane = laneIndex;
+      return { kind, laneIndex, atMs };
+    });
+    this.spawnPlanWave = this.waveNumber;
+  }
+
+  private pickLane(random: RandomSource, previousLane: number): number {
+    const candidates = [0, 1, 2, 3, 4].filter((lane) => lane !== previousLane);
+    return candidates[Math.floor(random() * candidates.length)] ?? 2;
+  }
+
+  private shuffle<T>(values: T[], random: RandomSource): void {
+    for (let index = values.length - 1; index > 0; index -= 1) {
+      const swapIndex = Math.floor(random() * (index + 1));
+      [values[index], values[swapIndex]] = [values[swapIndex], values[index]];
+    }
+  }
+
+  private createWaveRandom(wave: number): RandomSource {
+    let state = (this.runSeed ^ Math.imul(Math.floor(wave), 0x9e3779b1)) >>> 0;
+    return () => {
+      state = (state + 0x6d2b79f5) >>> 0;
+      let value = state;
+      value = Math.imul(value ^ (value >>> 15), value | 1);
+      value ^= value + Math.imul(value ^ (value >>> 7), value | 61);
+      return ((value ^ (value >>> 14)) >>> 0) / 0x1_0000_0000;
+    };
   }
 
   private resetRegularWaveCounters(): void {
     this.spawnedThisWave = 0;
-    this.spawnedHeavyThisWave = 0;
-    this.spawnedFlyingThisWave = 0;
+    this.spawnPlanWave = 0;
+    this.spawnPlan = [];
   }
 
   private normalizeWave(wave: number): number {
     if (!Number.isFinite(wave)) return 1;
     return Math.max(1, Math.min(9999, Math.floor(wave)));
+  }
+
+  private normalizeSeed(seed: number): number {
+    if (!Number.isFinite(seed)) return 1;
+    return Math.floor(seed) >>> 0;
   }
 }
