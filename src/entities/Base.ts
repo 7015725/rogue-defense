@@ -26,10 +26,25 @@ export class Base {
     return this.hp > 0;
   }
 
+  get missingHp(): number {
+    return Math.max(0, this.maxHpValue - this.hp);
+  }
+
   takeDamage(amount: number): void {
     if (!this.alive) return;
     this.hp = Math.max(0, this.hp - amount);
     this.scene.tweens.add({ targets: this.body, alpha: 0.45, duration: 55, yoyo: true });
+  }
+
+  heal(amount: number): number {
+    if (!this.alive || amount <= 0) return 0;
+    const before = this.hp;
+    this.hp = Math.min(this.maxHpValue, this.hp + amount);
+    return this.hp - before;
+  }
+
+  healFraction(fraction: number): number {
+    return this.heal(this.maxHpValue * Math.max(0, fraction));
   }
 
   increaseMaxHp(multiplier: number): void {
