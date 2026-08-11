@@ -4,13 +4,12 @@ import {
   BASE_X,
   BOSS,
   ENEMY_SPAWN_Y,
+  HEAVY,
   INFANTRY,
   LANE_OFFSETS,
 } from '../combat/constants';
-import type { Targetable } from '../combat/types';
+import type { ArmorGrade, EnemyDefinition, EnemyKind, Targetable } from '../combat/types';
 import type { Base } from './Base';
-
-export type EnemyKind = 'infantry' | 'boss';
 
 export interface EnemyRewards {
   xp: number;
@@ -19,10 +18,20 @@ export interface EnemyRewards {
 
 let nextEnemyId = 1;
 
+const ARMOR_LABELS: Record<ArmorGrade, string> = {
+  UNARMORED: '',
+  LIGHT: 'LIGHT ARMOR',
+  MEDIUM: 'MEDIUM ARMOR',
+  HEAVY: 'HEAVY ARMOR',
+};
+
 export class Enemy implements Targetable {
   readonly id = nextEnemyId++;
-  readonly armor: number;
+  readonly armorGrade: ArmorGrade;
 
+  private readonly baseArmor: number;
+  private armorBreakAmount = 0;
+  private armorBreakTimerMs = 0;
   private hp: number;
   private readonly maxHpValue: number;
   private readonly moveSpeed: number;
@@ -34,6 +43,7 @@ export class Enemy implements Targetable {
   private readonly spawnX: number;
   private readonly shape: Phaser.GameObjects.Rectangle;
   private readonly healthBar: Phaser.GameObjects.Rectangle;
+  private readonly armorBadge: Phaser.GameObjects.Text | null;
   private dead = false;
 
   constructor(
@@ -43,26 +53,43 @@ export class Enemy implements Targetable {
     laneIndex: number,
     private readonly onKilled: (enemy: Enemy, rewards: EnemyRewards) => void,
   ) {
-    const stats = kind === 'boss' ? BOSS : INFANTRY;
+    const stats = this.getDefinition(kind);
     this.maxHpValue = stats.hp;
     this.hp = stats.hp;
-    this.armor = stats.armor;
+    this.baseArmor = stats.armor;
+    this.armorGrade = stats.armorGrade;
     this.moveSpeed = stats.moveSpeed;
     this.attackDamage = stats.attackDamage;
     this.attackIntervalMs = stats.attackIntervalMs;
     this.rewards = { xp: stats.xp, credits: stats.credits };
 
     this.spawnX = BASE_X + LANE_OFFSETS[laneIndex % LANE_OFFSETS.length];
-    const size = kind === 'boss' ? 92 : 42;
-    const fill = kind === 'boss' ? 0xb45309 : 0x64748b;
+    this.shape = scene.add.rectangle(this.spawnX, ENEMY_SPAWN_Y, stats.size, stats.size, stats.color)
+      .setStrokeStyle(kind === 'heavy' ? 6 : 4, kind === 'heavy' ? 0xf8fafc : 0xe2e8f0);
+    this.healthBar = scene.add.rectangle(
+      this.spawnX,
+      ENEMY_SPAWN_Y - stats.size * 0.72,
+      stats.size,
+      8,
+      0x22c55e,
+    ).setOrigin(0.5, 0.5);
 
-    this.shape = scene.add.rectangle(this.spawnX, ENEMY_SPAWN_Y, size, size, fill).setStrokeStyle(4, 0xe2e8f0);
-    this.healthBar = scene.add.rectangle(this.spawnX, ENEMY_SPAWN_Y - size * 0.72, size, 8, 0x22c55e).setOrigin(0.5, 0.5);
+    const armorLabel = ARMOR_LABELS[this.armorGrade];
+    this.armorBadge = armorLabel
+      ? scene.add.text(this.spawnX, ENEMY_SPAWN_Y + stats.size * 0.72, armorLabel, {
+        fontFamily: 'monospace',
+        fontSize: kind === 'boss' ? '16px' : '12px',
+        color: this.armorGrade === 'HEAVY' ? '#f8fafc' : '#fde68a',
+        backgroundColor: '#020617bb',
+        padding: { x: 4, y: 2 },
+      }).setOrigin(0.5)
+      : null;
   }
 
   get x(): number { return this.shape.x; }
   get y(): number { return this.shape.y; }
   get alive(): boolean { return !this.dead; }
+  get armor(): number { return Math.max(0, this.baseArmor - this.armorBreakAmount); }
   get currentHp(): number { return this.hp; }
   get maxHp(): number { return this.maxHpValue; }
 
@@ -72,6 +99,11 @@ export class Enemy implements Targetable {
 
   update(deltaMs: number): void {
     if (this.dead) return;
+
+    if (this.armorBreakTimerMs > 0) {
+      this.armorBreakTimerMs = Math.max(0, this.armorBreakTimerMs - deltaMs);
+      if (this.armorBreakTimerMs === 0) this.armorBreakAmount = 0;
+    }
 
     if (this.stunTimerMs > 0) {
       this.stunTimerMs = Math.max(0, this.stunTimerMs - deltaMs);
@@ -86,7 +118,7 @@ export class Enemy implements Targetable {
       );
       this.shape.y = ENEMY_SPAWN_Y + (BASE_ATTACK_Y - ENEMY_SPAWN_Y) * nextProgress;
       this.shape.x = Phaser.Math.Linear(this.spawnX, BASE_X, Math.pow(nextProgress, 1.35));
-      this.syncHealthBar();
+      this.syncDecorations();
       return;
     }
 
@@ -104,8 +136,7 @@ export class Enemy implements Targetable {
 
     if (this.hp <= 0) {
       this.dead = true;
-      this.shape.destroy();
-      this.healthBar.destroy();
+      this.destroyVisuals();
       this.onKilled(this, this.rewards);
     }
   }
@@ -115,11 +146,25 @@ export class Enemy implements Targetable {
     this.stunTimerMs = Math.max(this.stunTimerMs, Math.max(0, durationMs));
   }
 
+  applyArmorBreak(amount: number, durationMs: number): void {
+    if (this.dead) return;
+    this.armorBreakAmount = Math.max(this.armorBreakAmount, Math.max(0, amount));
+    this.armorBreakTimerMs = Math.max(this.armorBreakTimerMs, Math.max(0, durationMs));
+  }
+
   destroy(): void {
     if (!this.shape.scene) return;
     this.dead = true;
-    this.shape.destroy();
-    this.healthBar.destroy();
+    this.destroyVisuals();
+  }
+
+  private getDefinition(kind: EnemyKind): EnemyDefinition {
+    switch (kind) {
+      case 'heavy': return HEAVY;
+      case 'boss': return BOSS;
+      case 'infantry':
+      default: return INFANTRY;
+    }
   }
 
   private updateHealthBar(): void {
@@ -127,7 +172,14 @@ export class Enemy implements Targetable {
     this.healthBar.scaleX = ratio;
   }
 
-  private syncHealthBar(): void {
+  private syncDecorations(): void {
     this.healthBar.setPosition(this.shape.x, this.shape.y - this.shape.height * 0.72);
+    this.armorBadge?.setPosition(this.shape.x, this.shape.y + this.shape.height * 0.72);
+  }
+
+  private destroyVisuals(): void {
+    this.shape.destroy();
+    this.healthBar.destroy();
+    this.armorBadge?.destroy();
   }
 }
