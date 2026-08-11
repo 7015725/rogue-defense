@@ -25,6 +25,9 @@ const config: Phaser.Types.Core.GameConfig = {
 const game = new Phaser.Game(config);
 
 if (isRuntimeProbeEnabled()) {
+  const devWindow = window as Window & { __rogueDefenseGame?: Phaser.Game };
+  devWindow.__rogueDefenseGame = game;
+
   window.setInterval(() => {
     const active = game.scene.getScenes(true)[0];
     if (!active) return;
