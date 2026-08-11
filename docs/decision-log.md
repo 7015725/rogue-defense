@@ -135,4 +135,18 @@
 - M0.9 的 W100 解锁条件保持不变：只有当前最高已解锁 Difficulty 达 W100，结算时才解锁下一档。
 - V0.1 Integration 后续工作以真实浏览器 Playtest、平衡、UI、性能、Save/Settlement 长局回归为主，不优先扩新核心系统。
 
-完整当前规格见 `v0.1-integration.md`；历史里程碑细节继续保留在对应 M0.x 文档中。
+## 2026-08-11 — V0.1 Integration / Playtest & Performance
+
+- Main Menu 在 Vite DEV 或 URL `?dev=1` 时显示 DEV LAUNCH；普通 Production URL 默认隐藏。
+- DEV LAUNCH 支持 W1/W10/W20/W50/W80/W100 快捷启动和 Stress 300。
+- Start Wave != 1 或 Stress > 0 的运行标记为 DEV Run；Settlement 在克隆 Save 上计算预览奖励，不写永久存档。
+- DEV W100 不会实际写 High Wave、解锁 Difficulty、增加 Gold/Account EXP 或 Lifetime Stats。
+- Stress 300 使用当前 Wave + Difficulty Scaling，但不发 Run EXP/Credits，也不计入正常 Kill/Boss Kill。
+- Projectile Pool 初始容量提高到 384；Active Count 在 `update()` 时缓存，HUD 查询改为 O(1)，并增加 `clear()` 用于 Checkpoint/Settlement 清场。
+- Enemy Status Badge 改为 Lazy Create；无 Status 的 Enemy 不创建 Text。可视标签约每 150ms 刷新，状态发生应用/消耗时立即同步。
+- Combat HUD 从每 Frame 重绘改为约 100ms 刷新；战斗 Simulation、Projectile、Status Tick 本身仍按 Frame/Simulation Delta 更新。
+- Combat HUD 正式加入 1×/2×/3×/4× 触控速度按钮，仍受 `speed-control` 科技上限限制。
+- 页面改用 `100dvw/100dvh`、Safe Area Insets、`viewport-fit=cover`、`overscroll-behavior:none`、`touch-action:none`，改善 Android Chrome / iOS Safari Canvas 触控与可用视口。
+- 本阶段自动 CI 只证明类型与生产构建正确；真长局、300 Enemy + 4×、横竖屏、内存和帧时间仍必须实际运行验证。
+
+完整当前规格见 `v0.1-integration.md` 与 `v0.1-playtest-tools.md`；历史里程碑细节继续保留在对应 M0.x 文档中。
