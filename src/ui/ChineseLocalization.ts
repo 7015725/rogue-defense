@@ -113,17 +113,20 @@ function localizeScene(scene: Phaser.Scene): void {
   for (const child of scene.children.list) localizeObject(child);
 }
 
+function attachSceneLocalization(scene: Phaser.Scene): void {
+  const apply = (): void => localizeScene(scene);
+  scene.events.on(Phaser.Scenes.Events.POST_UPDATE, apply);
+  scene.events.once(Phaser.Scenes.Events.SHUTDOWN, () => {
+    scene.events.off(Phaser.Scenes.Events.POST_UPDATE, apply);
+  });
+  apply();
+}
+
 export function installChineseLocalization(game: Phaser.Game): void {
   game.events.once(Phaser.Core.Events.READY, () => {
     for (const scene of game.scene.scenes) {
-      scene.events.on(Phaser.Scenes.Events.CREATE, () => {
-        const apply = (): void => localizeScene(scene);
-        scene.events.on(Phaser.Scenes.Events.POST_UPDATE, apply);
-        scene.events.once(Phaser.Scenes.Events.SHUTDOWN, () => {
-          scene.events.off(Phaser.Scenes.Events.POST_UPDATE, apply);
-        });
-        scene.time.delayedCall(0, apply);
-      });
+      scene.events.on(Phaser.Scenes.Events.CREATE, () => attachSceneLocalization(scene));
+      if (scene.scene.isActive()) attachSceneLocalization(scene);
     }
   });
 }
