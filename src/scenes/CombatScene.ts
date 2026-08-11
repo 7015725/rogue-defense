@@ -32,7 +32,6 @@ export class CombatScene extends Phaser.Scene {
   private upgradeDirector!: UpgradeDirectorLite;
   private upgradeOverlay!: UpgradeOverlay;
   private branchOverlay!: WeaponBranchOverlay;
-  private autoCannon!: Weapon;
   private readonly randomWeapons = new Map<RandomWeaponId, Weapon>();
   private weapons: Weapon[] = [];
   private enemies: Enemy[] = [];
@@ -73,14 +72,14 @@ export class CombatScene extends Phaser.Scene {
       (weapon, stage, choice) => this.handleBranchSelection(weapon, stage, choice),
     );
 
-    this.autoCannon = new Weapon(
+    const autoCannon = new Weapon(
       this,
       this.projectilePool,
       AUTO_CANNON,
       BATTLEFIELD_WIDTH / 2,
       TURRET_Y,
     );
-    this.weapons = [this.autoCannon];
+    this.weapons = [autoCannon];
     this.refreshWeaponModifiers();
 
     this.createUi();
@@ -121,7 +120,7 @@ export class CombatScene extends Phaser.Scene {
     } else if (this.waveManager.isComplete) {
       this.clearRemainingEnemies();
       this.finished = true;
-      this.showFinish('M0.4 TEST COMPLETE\nLv5 / Lv10 weapon routes active\nPress R to restart');
+      this.showFinish('M0.5 TEST COMPLETE\nHeavy armor pressure active\nPress R to restart');
     } else if (this.openPendingBranchChoice()) {
       // Weapon milestone choices have priority over queued Run upgrades.
     } else if (this.runState.pendingUpgrades > 0) {
@@ -286,8 +285,9 @@ export class CombatScene extends Phaser.Scene {
   }
 
   private updateUi(): void {
+    const heavyCount = this.enemies.filter((enemy) => enemy.kind === 'heavy').length;
     this.waveText.setText(`Wave ${this.waveManager.wave}${this.waveManager.isBossWave ? '  BOSS' : ''}`);
-    this.enemyText.setText(`Enemies ${this.enemies.length}`);
+    this.enemyText.setText(`Enemies ${this.enemies.length}${heavyCount > 0 ? ` · Heavy ${heavyCount}` : ''}`);
     this.runText.setText(`Run Lv ${this.runState.level}  EXP ${this.runState.xp}/${this.runState.xpToNextLevel}`);
     this.creditsText.setText(`Credits ${this.runState.credits}`);
     this.baseText.setText(`Base HP ${Math.ceil(this.base.currentHp)} / ${this.base.maxHp}`);
