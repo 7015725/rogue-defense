@@ -10,7 +10,7 @@ import {
   TURRET_Y,
   type RandomWeaponId,
 } from '../combat/constants';
-import type { ComboId } from '../combat/types';
+import type { ComboId, EnemyKind } from '../combat/types';
 import { Base } from '../entities/Base';
 import { Enemy, type EnemyRewards } from '../entities/Enemy';
 import { Weapon } from '../entities/Weapon';
@@ -41,7 +41,17 @@ import type { WeaponBranchChoice, WeaponBranchStage } from '../weapons/WeaponPro
 
 interface CombatSceneData {
   difficulty?: number;
+  startWave?: number;
+  stressCount?: number;
 }
+
+interface SpeedButton {
+  speed: number;
+  button: Phaser.GameObjects.Rectangle;
+  text: Phaser.GameObjects.Text;
+}
+
+const UI_REFRESH_MS = 100;
 
 export class CombatScene extends Phaser.Scene {
   private base!: Base;
@@ -58,6 +68,7 @@ export class CombatScene extends Phaser.Scene {
   private readonly activeCombos = new Set<ComboId>();
   private weapons: Weapon[] = [];
   private enemies: Enemy[] = [];
+  private speedButtons: SpeedButton[] = [];
   private gameSpeed = 1;
   private maxGameSpeed = 1;
   private finished = false;
@@ -65,6 +76,10 @@ export class CombatScene extends Phaser.Scene {
   private permanentSave!: PermanentSave;
   private kills = 0;
   private bossKills = 0;
+  private debugStartWave = 1;
+  private debugStressCount = 0;
+  private debugRun = false;
+  private uiRefreshAccumulatorMs = 0;
 
   private globalDamageMultiplier = 1;
   private globalAttackSpeedMultiplier = 1;
@@ -96,6 +111,16 @@ export class CombatScene extends Phaser.Scene {
     this.difficultyId = Math.min(requestedDifficulty, this.permanentSave.maxDifficultyUnlocked);
     this.permanentSave.selectedDifficulty = this.difficultyId;
     SaveService.save(this.permanentSave);
+
+    const devToolsEnabled = import.meta.env.DEV
+      || new URLSearchParams(window.location.search).get('dev') === '1';
+    this.debugStartWave = devToolsEnabled
+      ? Math.max(1, Math.min(9999, Math.floor(data?.startWave ?? 1)))
+      : 1;
+    this.debugStressCount = devToolsEnabled
+      ? Math.max(0, Math.min(600, Math.floor(data?.stressCount ?? 0)))
+      : 0;
+    this.debugRun = devToolsEnabled && (this.debugStartWave !== 1 || this.debugStressCount > 0);
   }
 
   create(): void {
@@ -103,10 +128,12 @@ export class CombatScene extends Phaser.Scene {
     this.activeCombos.clear();
     this.weapons = [];
     this.enemies = [];
+    this.speedButtons = [];
     this.kills = 0;
     this.bossKills = 0;
     this.finished = false;
     this.gameSpeed = 1;
+    this.uiRefreshAccumulatorMs = 0;
     this.globalDamageLevel = 0;
     this.globalAttackSpeedLevel = 0;
     this.baseHpUpgradeLevel = 0;
@@ -120,8 +147,8 @@ export class CombatScene extends Phaser.Scene {
     this.drawBattlefield();
 
     this.base = new Base(this);
-    this.projectilePool = new ProjectilePool(this, 256);
-    this.waveManager = new WaveManager();
+    this.projectilePool = new ProjectilePool(this, 384);
+    this.waveManager = new WaveManager(this.debugStartWave);
     this.runState = new RunState();
     this.upgradeDirector = new UpgradeDirectorLite();
     this.shopDirector = new BossShopDirector();
@@ -165,6 +192,8 @@ export class CombatScene extends Phaser.Scene {
     this.weapons = [autoCannon];
     this.refreshWeaponModifiers();
 
+    if (this.debugStressCount > 0) this.spawnStressEnemies(this.debugStressCount);
+
     this.createUi();
     this.bindControls();
     this.updateUi();
@@ -174,27 +203,16 @@ export class CombatScene extends Phaser.Scene {
     if (this.finished) return;
 
     if (this.isChoicePaused()) {
-      this.updateUi();
+      this.updateUiThrottled(delta);
       return;
     }
 
     const simDelta = Math.min(delta, 50) * this.gameSpeed;
     const bossAlive = this.enemies.some((enemy) => enemy.alive && enemy.kind === 'boss');
     const spawnRequests = this.waveManager.update(simDelta, bossAlive);
-    const difficulty = getDifficulty(this.difficultyId);
 
     for (const request of spawnRequests) {
-      this.enemies.push(new Enemy(
-        this,
-        this.base,
-        request.kind,
-        request.laneIndex,
-        (enemy, rewards) => this.handleEnemyKilled(enemy, rewards),
-        {
-          hpMultiplier: difficulty.enemyHpMultiplier,
-          damageMultiplier: difficulty.enemyDamageMultiplier,
-        },
-      ));
+      this.enemies.push(this.createEnemy(request.kind, request.laneIndex, true));
     }
 
     if (this.waveManager.consumeCheckpointClearRequested()) this.clearRemainingEnemies();
@@ -222,7 +240,34 @@ export class CombatScene extends Phaser.Scene {
       this.openUpgradeChoice();
     }
 
-    this.updateUi();
+    this.updateUiThrottled(delta);
+  }
+
+  private createEnemy(kind: EnemyKind, laneIndex: number, grantRewards: boolean): Enemy {
+    const difficulty = getDifficulty(this.difficultyId);
+    return new Enemy(
+      this,
+      this.base,
+      kind,
+      laneIndex,
+      grantRewards ? (enemy, rewards) => this.handleEnemyKilled(enemy, rewards) : () => undefined,
+      {
+        hpMultiplier: difficulty.enemyHpMultiplier,
+        damageMultiplier: difficulty.enemyDamageMultiplier,
+      },
+    );
+  }
+
+  private spawnStressEnemies(count: number): void {
+    WaveDirector.setActiveSpawnWave(this.waveManager.wave);
+    for (let index = 0; index < count; index += 1) {
+      const kind: EnemyKind = this.waveManager.wave >= 20 && index % 10 === 0
+        ? 'flying'
+        : index % 5 === 0
+          ? 'heavy'
+          : 'infantry';
+      this.enemies.push(this.createEnemy(kind, index % 5, false));
+    }
   }
 
   private handleEnemyKilled(enemy: Enemy, rewards: EnemyRewards): void {
@@ -545,6 +590,26 @@ export class CombatScene extends Phaser.Scene {
     this.weaponText = this.add.text(36, BATTLEFIELD_HEIGHT - 225, '', { ...style, fontSize: '14px' }).setDepth(10);
     this.debugText = this.add.text(BATTLEFIELD_WIDTH - 36, 36, '', { ...style, fontSize: '19px', align: 'right' }).setOrigin(1, 0).setDepth(10);
 
+    for (let speed = 1; speed <= 4; speed += 1) {
+      const x = 74 + (speed - 1) * 88;
+      const button = this.add.rectangle(x, 330, 76, 58, 0x1f2937)
+        .setStrokeStyle(2, 0x64748b)
+        .setInteractive({ useHandCursor: true })
+        .setDepth(10);
+      const text = this.add.text(x, 330, `${speed}×`, {
+        fontFamily: 'monospace', fontSize: '20px', color: '#e2e8f0', fontStyle: 'bold',
+      }).setOrigin(0.5).setDepth(11);
+      button.on('pointerup', () => {
+        this.setGameSpeed(speed);
+        this.updateUi();
+      });
+      text.setInteractive({ useHandCursor: true }).on('pointerup', () => {
+        this.setGameSpeed(speed);
+        this.updateUi();
+      });
+      this.speedButtons.push({ speed, button, text });
+    }
+
     const endButton = this.add.rectangle(BATTLEFIELD_WIDTH - 130, 330, 210, 62, 0x3f3f46)
       .setStrokeStyle(3, 0x71717a)
       .setInteractive({ useHandCursor: true })
@@ -556,6 +621,13 @@ export class CombatScene extends Phaser.Scene {
     endButton.on('pointerover', () => endButton.setAlpha(0.8));
     endButton.on('pointerout', () => endButton.setAlpha(1));
     endText.setInteractive({ useHandCursor: true }).on('pointerup', () => this.finishRun('VOLUNTARY_EXIT'));
+  }
+
+  private updateUiThrottled(deltaMs: number): void {
+    this.uiRefreshAccumulatorMs += Math.max(0, deltaMs);
+    if (this.uiRefreshAccumulatorMs < UI_REFRESH_MS) return;
+    this.uiRefreshAccumulatorMs %= UI_REFRESH_MS;
+    this.updateUi();
   }
 
   private updateUi(): void {
@@ -579,17 +651,30 @@ export class CombatScene extends Phaser.Scene {
       `S${index + 1} ${weapon.progressionLabel} · HP ${Math.ceil(weapon.currentHp)}/${weapon.maxHp} · Ammo ${weapon.ammoLabel} · ${weapon.currentState}`
     )));
 
+    for (const item of this.speedButtons) {
+      const locked = item.speed > this.maxGameSpeed;
+      const active = item.speed === this.gameSpeed;
+      item.button.setFillStyle(active ? 0x1d4ed8 : locked ? 0x111827 : 0x1f2937);
+      item.button.setStrokeStyle(2, active ? 0x93c5fd : locked ? 0x334155 : 0x64748b);
+      item.text.setColor(locked ? '#475569' : active ? '#eff6ff' : '#e2e8f0');
+      item.text.setText(locked ? `${item.speed}× L` : `${item.speed}×`);
+    }
+
+    const debugLabel = this.debugRun
+      ? `DEV W${this.debugStartWave}${this.debugStressCount > 0 ? ` +${this.debugStressCount} STRESS` : ''}`
+      : null;
     this.debugText.setText([
       `Speed ${this.gameSpeed}x / ${this.maxGameSpeed}x${this.isChoicePaused() ? ' · PAUSED' : ''}`,
       `Budget ${this.waveManager.isBossWave ? 'BOSS' : this.waveManager.populationBudget} · HP ${scaling.hpMultiplier.toFixed(2)}x · DMG ${scaling.damageMultiplier.toFixed(2)}x`,
       `Kills ${this.kills} · Boss ${this.bossKills}`,
       `Weapons ${this.weapons.length}/5 · Secondary AA ${hasSecondaryAa ? 'YES' : 'NO'}`,
       `Combos ${this.activeCombos.size}/4`,
-      `Projectiles ${this.projectilePool.activeCount}`,
+      `Projectiles ${this.projectilePool.activeCount}/${this.projectilePool.size}`,
       `FPS ${Math.round(this.game.loop.actualFps)}`,
       `Meta DMG +${this.permanentSave.tech.damageTraining * 3}%`,
-      'Keys: 1-4 speed · E settle',
-    ]);
+      debugLabel,
+      'Touch: speed · E settle',
+    ].filter((line): line is string => line !== null));
   }
 
   private bindControls(): void {
@@ -617,6 +702,7 @@ export class CombatScene extends Phaser.Scene {
       kills: this.kills,
       bossKills: this.bossKills,
       reason,
+      debugRun: this.debugRun,
     };
     this.scene.start('SettlementScene', { summary });
   }
@@ -624,5 +710,6 @@ export class CombatScene extends Phaser.Scene {
   private clearRemainingEnemies(): void {
     for (const enemy of this.enemies) enemy.destroy();
     this.enemies = [];
+    this.projectilePool.clear();
   }
 }
