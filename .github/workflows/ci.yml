@@ -60,6 +60,15 @@ jobs:
           fi
           exit 0
 
+      - name: Upload validated web RC
+        if: steps.build.outputs.exit_code == '0' && steps.smoke.outputs.exit_code == '0'
+        uses: actions/upload-artifact@v7
+        with:
+          name: rogue-defense-v0.1-rc1-web
+          path: dist
+          if-no-files-found: error
+          retention-days: 14
+
       - name: Publish commit statuses
         if: always()
         env:
