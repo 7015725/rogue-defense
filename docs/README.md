@@ -3,7 +3,8 @@
 ## 当前阶段：V0.1 Integration
 
 - [`v0.1-integration.md`](v0.1-integration.md)：Endless Wave、Population Budget、Wave Scaling、W100 难度解锁与 W101+ 延续规则。
-- [`v0.1-validation.md`](v0.1-validation.md)：V0.1 Endless/W100、长局回归与性能验证清单。
+- [`v0.1-playtest-tools.md`](v0.1-playtest-tools.md)：DEV 快捷 Wave、Stress 300、无存档 DEV Settlement、HUD/Status/Projectile 性能优化与移动端触控规则。
+- [`v0.1-validation.md`](v0.1-validation.md)：V0.1 Endless/W100、DEV、移动端、长局回归与性能验证清单。
 
 ## 已完成里程碑
 
