@@ -573,10 +573,12 @@ export class CombatScene extends Phaser.Scene {
     this.add.text(44, BASE_ATTACK_Y - 38, 'BASE ATTACK LINE', { fontSize: '20px', color: '#fca5a5' });
 
     for (const offset of [-160, -80, 0, 80, 160]) {
-      this.add.line(0, 0, BATTLEFIELD_WIDTH / 2 + offset, ENEMY_SPAWN_Y + 60, BATTLEFIELD_WIDTH / 2, BASE_ATTACK_Y, 0x334155, 0.28).setOrigin(0, 0);
+      const laneX = BATTLEFIELD_WIDTH / 2 + offset;
+      this.add.line(0, 0, laneX, ENEMY_SPAWN_Y + 60, laneX, BASE_ATTACK_Y, 0x334155, 0.28).setOrigin(0, 0);
     }
     for (const offset of [-260, 0, 260]) {
-      this.add.line(0, 0, BATTLEFIELD_WIDTH / 2 + offset, ENEMY_SPAWN_Y + 90, BATTLEFIELD_WIDTH / 2, BASE_ATTACK_Y, 0x0ea5e9, 0.12).setOrigin(0, 0);
+      const laneX = BATTLEFIELD_WIDTH / 2 + offset;
+      this.add.line(0, 0, laneX, ENEMY_SPAWN_Y + 90, laneX, BASE_ATTACK_Y, 0x0ea5e9, 0.12).setOrigin(0, 0);
     }
   }
 
