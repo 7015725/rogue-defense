@@ -30,23 +30,23 @@ export class WeaponReplacementOverlay {
       BATTLEFIELD_WIDTH,
       BATTLEFIELD_HEIGHT,
       0x020617,
-      0.97,
+      0.98,
     ));
 
-    container.add(this.scene.add.text(BATTLEFIELD_WIDTH / 2, 245, '选择要替换的武器', {
-      fontFamily: 'monospace', fontSize: '46px', color: '#f8fafc', fontStyle: 'bold',
+    container.add(this.scene.add.text(BATTLEFIELD_WIDTH / 2, 170, '选择要替换的武器', {
+      fontFamily: 'monospace', fontSize: '52px', color: '#f8fafc', fontStyle: 'bold',
     }).setOrigin(0.5));
-    container.add(this.scene.add.text(BATTLEFIELD_WIDTH / 2, 320, `${newWeaponName} 将以 Lv${replacementLevel} 部署\n旧武器路线与专精永久丢失`, {
-      fontFamily: 'monospace', fontSize: '23px', color: '#fca5a5', align: 'center', lineSpacing: 8,
+    container.add(this.scene.add.text(BATTLEFIELD_WIDTH / 2, 255, `${newWeaponName} 将以 Lv${replacementLevel} 部署\n旧武器路线与专精永久丢失`, {
+      fontFamily: 'monospace', fontSize: '29px', color: '#fca5a5', align: 'center', lineSpacing: 10,
     }).setOrigin(0.5));
 
     candidates.forEach((candidate, index) => {
-      const y = 510 + index * 190;
-      const card = this.scene.add.rectangle(BATTLEFIELD_WIDTH / 2, y, 760, 140, 0x172033)
-        .setStrokeStyle(4, 0xf59e0b)
+      const y = 470 + index * 195;
+      const card = this.scene.add.rectangle(BATTLEFIELD_WIDTH / 2, y, 880, 150, 0x172033)
+        .setStrokeStyle(5, 0xf59e0b)
         .setInteractive({ useHandCursor: true });
       const text = this.scene.add.text(BATTLEFIELD_WIDTH / 2, y, `${candidate.name} · Lv${candidate.level}`, {
-        fontFamily: 'monospace', fontSize: '30px', color: '#f8fafc', fontStyle: 'bold',
+        fontFamily: 'monospace', fontSize: '36px', color: '#f8fafc', fontStyle: 'bold',
       }).setOrigin(0.5);
       card.on('pointerover', () => card.setFillStyle(0x1e293b));
       card.on('pointerout', () => card.setFillStyle(0x172033));
@@ -54,11 +54,11 @@ export class WeaponReplacementOverlay {
       container.add([card, text]);
     });
 
-    const cancel = this.scene.add.rectangle(BATTLEFIELD_WIDTH / 2, 1345, 520, 100, 0x1f2937)
-      .setStrokeStyle(3, 0x64748b)
+    const cancel = this.scene.add.rectangle(BATTLEFIELD_WIDTH / 2, 1325, 560, 112, 0x1f2937)
+      .setStrokeStyle(4, 0x64748b)
       .setInteractive({ useHandCursor: true });
-    const cancelText = this.scene.add.text(BATTLEFIELD_WIDTH / 2, 1345, '取消替换', {
-      fontFamily: 'monospace', fontSize: '25px', color: '#cbd5e1',
+    const cancelText = this.scene.add.text(BATTLEFIELD_WIDTH / 2, 1325, '取消替换', {
+      fontFamily: 'monospace', fontSize: '30px', color: '#cbd5e1', fontStyle: 'bold',
     }).setOrigin(0.5);
     cancel.on('pointerup', () => this.choose(null));
     container.add([cancel, cancelText]);
