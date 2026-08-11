@@ -1,5 +1,5 @@
 import { mkdirSync, writeFileSync } from 'node:fs';
-import { expect, test, type Page } from '@playwright/test';
+import { expect, test, type Browser, type Page } from '@playwright/test';
 
 const LOGICAL_WIDTH = 1000;
 const LOGICAL_HEIGHT = 1600;
@@ -163,7 +163,7 @@ async function measureStressFps(page: Page, wave: 1 | 50 | 100): Promise<number>
   });
 
   await expect.poll(async () => Number(await app.getAttribute('data-enemy-count'))).toBeGreaterThanOrEqual(300);
-  await page.waitForTimeout(500);
+  await page.waitForTimeout(750);
 
   return page.evaluate(() => new Promise<number>((resolve) => {
     const frameTimes: number[] = [];
@@ -195,16 +195,30 @@ async function measureStressFps(page: Page, wave: 1 | 50 | 100): Promise<number>
   }));
 }
 
-test('Stress300 automated Chromium baseline remains responsive at W1/W50/W100', async ({ browser }) => {
-  test.setTimeout(60_000);
-  const metrics: Record<string, number> = {};
-  for (const wave of [1, 50, 100] as const) {
+async function measureWaveMedian(browser: Browser, wave: 1 | 50 | 100): Promise<{ median: number; samples: number[] }> {
+  const samples: number[] = [];
+  for (let trial = 0; trial < 3; trial += 1) {
     const page = await browser.newPage();
-    metrics[`W${wave}`] = await measureStressFps(page, wave);
+    samples.push(await measureStressFps(page, wave));
     await page.close();
+  }
+  const sorted = [...samples].sort((a, b) => a - b);
+  return { median: sorted[1] ?? 0, samples };
+}
+
+test('Stress300 automated Chromium baseline remains responsive at W1/W50/W100', async ({ browser }) => {
+  test.setTimeout(120_000);
+  const metrics: Record<string, number> = {};
+  const rawSamples: Record<string, number[]> = {};
+
+  for (const wave of [1, 50, 100] as const) {
+    const result = await measureWaveMedian(browser, wave);
+    metrics[`W${wave}`] = result.median;
+    rawSamples[`W${wave}`] = result.samples;
   }
 
   mkdirSync('test-results', { recursive: true });
-  writeFileSync('test-results/rc-perf.json', `${JSON.stringify(metrics, null, 2)}\n`, 'utf8');
+  writeFileSync('test-results/rc-perf.json', `${JSON.stringify({ metrics, samples: rawSamples }, null, 2)}\n`, 'utf8');
   console.log(`RC_PERF ${JSON.stringify(metrics)}`);
+  console.log(`RC_PERF_SAMPLES ${JSON.stringify(rawSamples)}`);
 });
