@@ -52,10 +52,8 @@ if (isRuntimeProbeEnabled()) {
 
     if (active.scene.key === 'SettlementScene') {
       publishRuntimeProbe({ scene: 'settlement' });
-      return;
     }
-
-    publishRuntimeProbe({ scene: 'menu' });
+    // MainMenuScene publishes its own detailed startWave/stress state on every render.
   }, 100);
 }
 
