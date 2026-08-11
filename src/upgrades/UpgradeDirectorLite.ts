@@ -70,7 +70,6 @@ const BASE_OPTIONS: readonly UpgradeOption[] = [
 
 const WEAPON_DESCRIPTIONS: Record<RandomWeaponId, string> = {
   lmg: '高频持续火力 · 可对空\n独立弹匣与 Reload',
-  shotgun: '近距离锥形 AOE · 仅地面\n越靠近命中弹丸越多',
   sniper: '全场高伤单体 · 可对空\n优先最高 HP 目标',
   'auto-gl': '延迟落点爆炸 · 仅地面\n中距离范围伤害',
   tesla: '短距连锁电击 · 仅地面\n3 目标 + Stun / Charged',
@@ -197,20 +196,7 @@ export class UpgradeDirectorLite {
     const active = new Set<ComboId>(context.activeComboIds);
     const options: UpgradeOption[] = [];
 
-    if (!active.has('DETONATION') && ownedWeapons.has('shotgun') && ownedWeapons.has('auto-gl')) {
-      options.push({
-        id: 'combo:DETONATION',
-        kind: 'combo',
-        comboId: 'DETONATION',
-        title: '爆燃协议',
-        description: 'Burn + Explosion\n结算部分剩余燃烧并消耗 1 层 Burn',
-        rarity: 'RARE',
-        weight: 4,
-      });
-    }
-
-    if (!active.has('CONCUSSIVE_BREAK') && ownedWeapons.has('tesla')
-      && (ownedWeapons.has('sniper') || ownedWeapons.has('shotgun'))) {
+    if (!active.has('CONCUSSIVE_BREAK') && ownedWeapons.has('tesla') && ownedWeapons.has('sniper')) {
       options.push({
         id: 'combo:CONCUSSIVE_BREAK',
         kind: 'combo',
