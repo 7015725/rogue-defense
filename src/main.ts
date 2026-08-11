@@ -2,6 +2,8 @@ import * as Phaser from 'phaser';
 import './style.css';
 import { BATTLEFIELD_HEIGHT, BATTLEFIELD_WIDTH } from './combat/constants';
 import { CombatScene } from './scenes/CombatScene';
+import { MainMenuScene } from './scenes/MainMenuScene';
+import { SettlementScene } from './scenes/SettlementScene';
 
 const config: Phaser.Types.Core.GameConfig = {
   type: Phaser.AUTO,
@@ -16,7 +18,7 @@ const config: Phaser.Types.Core.GameConfig = {
     mode: Phaser.Scale.FIT,
     autoCenter: Phaser.Scale.CENTER_BOTH,
   },
-  scene: [CombatScene],
+  scene: [MainMenuScene, CombatScene, SettlementScene],
 };
 
 new Phaser.Game(config);
