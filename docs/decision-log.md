@@ -65,4 +65,21 @@
 - 防空结构保护：Wave 15+ 缺副防空时 LMG / Sniper 解锁权重 ×3；Wave 18+ 若仍缺且此前未展示过，则下一次升级界面强制包含 LMG 或 Sniper。
 - 防空保底只保证出现选项，不自动给予；固定 Auto Cannon 提供最低防空安全线。
 
-完整细节见 `game-design-v0.2.md`、`m0.5-design.md`、`m0.6-design.md`。
+## 2026-08-11 — M0.7 Status + Combo
+
+- `Enemy` 原有独立 `stunTimerMs / armorBreakTimerMs` 已迁移到统一 `StatusEffectSystem`。
+- 正式状态：BURN / SLOW / FREEZE / STUN / ARMOR_BREAK / CHARGED；烟幕使用补充状态 SUPPRESSED 表达 AttackSpeed Debuff。
+- Burn 最多 3 层、5s、1s Tick；DOT 直接扣 HP，不经过 ArmorSystem。
+- Slow 可累积，达到 65% 阈值时转换为 Freeze 1s；最大 Slow 75%。
+- Tesla 基础命中建立 Charged 2.5s + Stun；Auto-GL γ Smoke 使敌人攻击速度 -40% / 6s。
+- Boss 不免疫硬控：连续 STUN/FREEZE 每次提高 15% Control Resistance，最高 75%，并每秒衰减 5 个百分点；最低仍保留 25% 原始控制时长。
+- DamageSystem 统一执行 Direct Damage → Combo → 新 Status Application，确保 Projectile / Cone / AOE / Chain / Radial 使用同一触发顺序。
+- 首批 4 Combo 为稀有三选一卡：爆燃协议、震荡破甲、电力过载、控制处决；未获得时不会自动触发。
+- 爆燃协议：Burn + Explosion，结算 35% 剩余 Burn 潜力并消耗 1 层 Burn。
+- 震荡破甲：Hard Control + Heavy Hit，ArmorBreak 35 / 4s。
+- 电力过载：Charged + Lightning，主目标追加 35% 本次有效伤害，并向 260 范围最近同 Domain 目标溢出同额电弧伤害。
+- 控制处决：Hard Control + Sniper Critical，追加 75% 本次有效伤害。
+- Combo 从 Run Lv8+ 开始进入候选池，并根据已拥有武器做基本前置过滤；已获得 Combo 移出本局候选池。
+- M0.4 中龙息、温压、烟幕、冲击波的占位路线文案已同步改为当前真实 Status 效果。
+
+完整细节见 `game-design-v0.2.md`、`m0.6-design.md`、`m0.7-design.md`。
