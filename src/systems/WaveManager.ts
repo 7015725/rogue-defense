@@ -1,6 +1,7 @@
 import {
   TEST_WAVE_COMPOSITIONS,
   WAVE20_AIR_ESCORT_COUNT,
+  WAVE30_AIR_ESCORT_COUNT,
   WAVE_DURATION_MS,
   WAVE_SPAWN_WINDOW_MS,
 } from '../combat/constants';
@@ -23,18 +24,19 @@ export class WaveManager {
   private bossSpawned = false;
   private completed = false;
   private checkpointClearRequested = false;
+  private shopRequestedWave: number | null = null;
+  private waitingForShop = false;
   private laneCursor = 0;
 
   get wave(): number { return this.waveNumber; }
   get isComplete(): boolean { return this.completed; }
-  get isBossWave(): boolean { return this.waveNumber === 10 || this.waveNumber === 20; }
+  get isBossWave(): boolean { return this.waveNumber % 10 === 0 && this.waveNumber <= 30; }
+  get shopPending(): boolean { return this.waitingForShop; }
 
   update(deltaMs: number, bossAlive: boolean): SpawnRequest[] {
-    if (this.completed) return [];
+    if (this.completed || this.waitingForShop) return [];
 
-    if (this.isBossWave) {
-      return this.updateBossWave(bossAlive);
-    }
+    if (this.isBossWave) return this.updateBossWave(bossAlive);
 
     const composition = TEST_WAVE_COMPOSITIONS[this.waveNumber - 1];
     if (!composition) return [];
@@ -71,32 +73,48 @@ export class WaveManager {
     return requested;
   }
 
-  private updateBossWave(bossAlive: boolean): SpawnRequest[] {
-    if (!this.bossSpawned) {
-      this.bossSpawned = true;
-      const requests: SpawnRequest[] = [{ kind: 'boss', laneIndex: 2 }];
+  consumeShopRequested(): number | null {
+    const wave = this.shopRequestedWave;
+    this.shopRequestedWave = null;
+    return wave;
+  }
 
-      if (this.waveNumber === 20) {
-        for (let index = 0; index < WAVE20_AIR_ESCORT_COUNT; index += 1) {
-          requests.push({ kind: 'flying', laneIndex: index % 5 });
-        }
-      }
+  resumeAfterShop(): void {
+    if (!this.waitingForShop) return;
+    this.waitingForShop = false;
 
-      return requests;
-    }
-
-    if (bossAlive) return [];
-
-    this.checkpointClearRequested = true;
-    if (this.waveNumber === 20) {
+    if (this.waveNumber >= 30) {
       this.completed = true;
-      return [];
+      return;
     }
 
     this.waveNumber += 1;
     this.waveElapsedMs = 0;
     this.bossSpawned = false;
     this.resetRegularWaveCounters();
+  }
+
+  private updateBossWave(bossAlive: boolean): SpawnRequest[] {
+    if (!this.bossSpawned) {
+      this.bossSpawned = true;
+      const requests: SpawnRequest[] = [{ kind: 'boss', laneIndex: 2 }];
+      const escortCount = this.waveNumber === 20
+        ? WAVE20_AIR_ESCORT_COUNT
+        : this.waveNumber === 30
+          ? WAVE30_AIR_ESCORT_COUNT
+          : 0;
+
+      for (let index = 0; index < escortCount; index += 1) {
+        requests.push({ kind: 'flying', laneIndex: index % 5 });
+      }
+      return requests;
+    }
+
+    if (bossAlive) return [];
+
+    this.checkpointClearRequested = true;
+    this.waitingForShop = true;
+    this.shopRequestedWave = this.waveNumber;
     return [];
   }
 
