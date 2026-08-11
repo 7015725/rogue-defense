@@ -6,7 +6,7 @@
 
 **V0.1 Web Release Candidate — `0.1.0-rc.1`**
 
-M0.1～M0.9 的主要系统、Endless Wave、W100 解锁链、DEV Playtest/Stress 工具均已落地。RC 阶段停止扩张核心系统，重点转为浏览器 Gate、可分发构建、PWA、真长局、平衡、UI、性能和真实设备回归。
+M0.1～M0.9 的主要系统、Endless Wave、W100 解锁链、DEV Playtest/Stress 工具均已落地。RC 阶段停止扩张核心系统，重点转为浏览器 Gate、真长局、平衡、UI、性能和真实设备回归。
 
 当前代码具备：
 
@@ -29,9 +29,12 @@ M0.1～M0.9 的主要系统、Endless Wave、W100 解锁链、DEV Playtest/Stres
 - DEV W1/W10/W20/W50/W80/W100 快捷启动；
 - DEV Stress 300，DEV Settlement 不写永久 Save；
 - Projectile Pool / Status Text / HUD 高频路径优化；
+- >=180 Active Enemy 自动进入 Crowd LOD，普通敌人主体合批渲染；
 - Safe Area / `100dvh` / Touch 移动端适配；
 - PWA Manifest + Service Worker + App Icon；
 - Chromium Production Browser Smoke Gate；
+- RC Checkpoint Functional Soak；
+- CI Stress300 性能 Gate；
 - CI 自动生成验证后的 Web RC Artifact。
 
 Wave100 是 Difficulty 解锁里程碑，**不是单局结束点**。
@@ -59,6 +62,30 @@ npm run dev
 npm run build
 npm run preview
 ```
+
+### 手机局域网实机测试
+
+电脑和手机连接同一 Wi-Fi：
+
+```bash
+npm install
+npm run build
+npm run preview:lan
+```
+
+手机浏览器访问：
+
+```text
+http://<电脑局域网IP>:4173/
+```
+
+DEV 快捷测试：
+
+```text
+http://<电脑局域网IP>:4173/?dev=1
+```
+
+局域网 HTTP 已可验证 Android/iOS 浏览器玩法、Touch、横竖屏、Save 与 Stress300。PWA 安装/Service Worker 实机验收需要 HTTPS，因此放到 Pages 或其他 HTTPS 部署后测试。
 
 浏览器 Smoke Test 使用 Playwright。CI 会自动安装固定版本；本地需要先安装测试依赖与 Chromium：
 
@@ -103,6 +130,10 @@ TypeScript strict
 → Vite Production Build
 → Chromium Browser Smoke
 → validated dist Artifact
+
+RC Soak:
+Checkpoint Functional
+→ Stress300 Performance
 ```
 
 Commit Status：
@@ -110,7 +141,21 @@ Commit Status：
 ```text
 ci/build
 ci/smoke
+ci/artifact
+ci/soak-functional
+ci/perf
+ci/soak
 ```
+
+当前 Stress300 CI Chromium 基线：
+
+```text
+W1      18.37 FPS
+W50     16.07 FPS
+W100    25.72 FPS
+```
+
+最低自动 Gate 为 15 FPS。该结果只代表 CI Chromium 基线；真机 4×、温度、触控与长时间内存仍需要设备验证。
 
 通过后 CI 上传：
 
@@ -137,6 +182,7 @@ PWA 使用原生 Manifest + Service Worker，不增加运行时框架依赖。
 - [设计文档索引](docs/README.md)
 - [V0.1 Web RC](docs/v0.1-web-rc.md)
 - [V0.1 RC Validation](docs/v0.1-rc-validation.md)
+- [V0.1 Real-Device Test](docs/v0.1-device-test.md)
 - [V0.1 Integration](docs/v0.1-integration.md)
 - [V0.1 Playtest / Performance Tools](docs/v0.1-playtest-tools.md)
 - [V0.2 游戏系统设计总稿](docs/game-design-v0.2.md)
@@ -159,6 +205,8 @@ M0.9  结算 + 科技树 + Save         ✓
 V0.1  Integration / Playtest       ✓
 V0.1  Web RC                       ← 当前
        ↓
+V0.1  Real-device Playtest
+       ↓
 V0.1  Web Release
        ↓
 Android APK
@@ -167,10 +215,10 @@ Android APK
 ## RC 剩余关键验收
 
 - W1 → W100 真长局；
-- W100 Boss → Shop → W101；
+- 正常 Build 的 W100 Boss → Shop → W101；
 - 正常 W100 Settlement 解锁下一 Difficulty；
-- DEV W1/W50/W100 + Stress300 的 4× 真机 FPS；
 - Android Chrome / iOS Safari 横竖屏；
+- 真机 W1/W50/W100 + Stress300 与 4× 响应；
 - PWA 安装、重启与 Service Worker 更新；
 - 长局内存、Projectile/Status 峰值；
 - Boss Shop / Upgrade Director / Wave Scaling 第一轮平衡。
