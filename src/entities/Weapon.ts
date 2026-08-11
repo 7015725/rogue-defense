@@ -20,7 +20,7 @@ import {
   type WeaponBranchStage,
 } from '../weapons/WeaponProgression';
 
-export type WeaponState = 'IDLE' | 'TARGETING' | 'FIRING' | 'COOLDOWN' | 'EMPTY' | 'RELOADING';
+export type WeaponState = 'IDLE' | 'TARGETING' | 'FIRING' | 'COOLDOWN' | 'EMPTY' | 'RELOADING' | 'DISABLED';
 
 interface PendingGrenade {
   x: number;
@@ -31,6 +31,7 @@ interface PendingGrenade {
 }
 
 export class Weapon {
+  private readonly mount: Phaser.GameObjects.Rectangle;
   private readonly barrel: Phaser.GameObjects.Rectangle;
   private state: WeaponState = 'TARGETING';
   private ammo: number;
@@ -38,6 +39,8 @@ export class Weapon {
   private reloadTimerMs = 0;
   private target: Targetable | null = null;
   private levelValue = 1;
+  private hpValue: number;
+  private disabledValue = false;
   private globalDamageMultiplier = 1;
   private globalAttackSpeedMultiplier = 1;
   private readonly pendingGrenades: PendingGrenade[] = [];
@@ -55,13 +58,18 @@ export class Weapon {
     readonly y: number,
   ) {
     this.ammo = definition.magazineSize;
-    scene.add.rectangle(this.x, this.y, 90, 70, 0x475569).setStrokeStyle(4, definition.color);
+    this.hpValue = definition.maxHp;
+    this.mount = scene.add.rectangle(this.x, this.y, 90, 70, 0x475569).setStrokeStyle(4, definition.color);
     this.barrel = scene.add.rectangle(this.x, this.y - 50, 18, 100, definition.color).setOrigin(0.5, 0.88);
   }
 
   get id(): string { return this.definition.id; }
   get name(): string { return this.definition.name; }
   get currentAmmo(): number { return this.ammo; }
+  get currentHp(): number { return this.hpValue; }
+  get maxHp(): number { return this.definition.maxHp; }
+  get missingHp(): number { return Math.max(0, this.maxHp - this.hpValue); }
+  get disabled(): boolean { return this.disabledValue; }
   get magazineSize(): number {
     if (this.definition.magazineSize <= 0) return 0;
     return Math.max(1, Math.round(this.definition.magazineSize * (this.branchEffect.magazineMultiplier ?? 1)));
@@ -86,7 +94,8 @@ export class Weapon {
     const route = this.lv5Branch ? ` · ${this.lv5Branch.title}` : '';
     const specialization = this.lv10Specialization ? ` · ${this.lv10Specialization.title}` : '';
     const domain = this.canTargetAir ? ' · AA' : '';
-    return `${this.name} Lv${this.level}${route}${specialization}${domain}`;
+    const disabled = this.disabled ? ' · DISABLED' : '';
+    return `${this.name} Lv${this.level}${route}${specialization}${domain}${disabled}`;
   }
   get pendingBranchStage(): WeaponBranchStage | null {
     if (this.levelValue >= 5 && !this.lv5BranchId) return 5;
@@ -107,6 +116,41 @@ export class Weapon {
     if (this.levelValue >= this.maxLevel) return false;
     this.levelValue += 1;
     return true;
+  }
+
+  upgradeToLevel(targetLevel: number): void {
+    const target = Phaser.Math.Clamp(Math.floor(targetLevel), 1, this.maxLevel);
+    while (this.levelValue < target) this.levelValue += 1;
+  }
+
+  takeDamage(amount: number): void {
+    if (amount <= 0) return;
+    this.hpValue = Math.max(0, this.hpValue - amount);
+    if (this.hpValue <= 0) {
+      this.disabledValue = true;
+      this.state = 'DISABLED';
+      this.target = null;
+      this.setDisabledVisual(true);
+    }
+  }
+
+  repair(amount: number): number {
+    if (amount <= 0) return 0;
+    const before = this.hpValue;
+    this.hpValue = Math.min(this.maxHp, this.hpValue + amount);
+    this.tryReactivate();
+    return this.hpValue - before;
+  }
+
+  repairFull(): number {
+    return this.repair(this.maxHp);
+  }
+
+  destroy(): void {
+    this.mount.destroy();
+    this.barrel.destroy();
+    for (const grenade of this.pendingGrenades) grenade.marker.destroy();
+    this.pendingGrenades.length = 0;
   }
 
   getBranchChoices(stage: WeaponBranchStage): readonly WeaponBranchChoice[] {
@@ -136,6 +180,12 @@ export class Weapon {
 
   update(deltaMs: number, targets: readonly Targetable[]): void {
     this.updatePendingGrenades(deltaMs, targets);
+
+    if (this.disabledValue) {
+      this.state = 'DISABLED';
+      this.repair(this.definition.autoRepairPerSecond * (deltaMs / 1000));
+      return;
+    }
 
     if (this.state === 'RELOADING') {
       this.reloadTimerMs -= deltaMs;
@@ -285,17 +335,13 @@ export class Weapon {
         applications.push({ type: 'SUPPRESSED', durationMs: 6000, magnitude: 0.40, sourceWeaponId: this.id });
       }
       const stunMs = Math.max(0, this.branchEffect.stunMsBonus ?? 0);
-      if (stunMs > 0) {
-        applications.push({ type: 'STUN', durationMs: stunMs, sourceWeaponId: this.id });
-      }
+      if (stunMs > 0) applications.push({ type: 'STUN', durationMs: stunMs, sourceWeaponId: this.id });
     }
 
     if (this.id === 'tesla' && (mode === 'tesla' || mode === 'tesla-radial')) {
       applications.push({ type: 'CHARGED', durationMs: 2500, sourceWeaponId: this.id });
       const stunMs = Math.max(0, (this.definition.stunMs ?? 0) + (this.branchEffect.stunMsBonus ?? 0));
-      if (stunMs > 0) {
-        applications.push({ type: 'STUN', durationMs: stunMs, sourceWeaponId: this.id });
-      }
+      if (stunMs > 0) applications.push({ type: 'STUN', durationMs: stunMs, sourceWeaponId: this.id });
     }
 
     return applications;
@@ -305,22 +351,12 @@ export class Weapon {
     if (this.magazineSize > 0) this.ammo -= 1;
 
     switch (this.getMode()) {
-      case 'shotgun':
-        this.fireShotgun(target, targets);
-        break;
-      case 'grenade':
-        this.fireGrenade(target);
-        break;
-      case 'tesla':
-        this.fireTesla(target, targets);
-        break;
-      case 'tesla-radial':
-        this.fireTeslaRadial(targets);
-        break;
+      case 'shotgun': this.fireShotgun(target, targets); break;
+      case 'grenade': this.fireGrenade(target); break;
+      case 'tesla': this.fireTesla(target, targets); break;
+      case 'tesla-radial': this.fireTeslaRadial(targets); break;
       case 'projectile':
-      default:
-        this.fireProjectiles(target, targets);
-        break;
+      default: this.fireProjectiles(target, targets); break;
     }
 
     this.scene.tweens.add({ targets: this.barrel, scaleY: 0.82, duration: 45, yoyo: true });
@@ -380,10 +416,8 @@ export class Weapon {
 
     for (const candidate of targets) {
       if (!TargetingSystem.canTarget(candidate, this.definition.targetDomains)) continue;
-
       const distance = Phaser.Math.Distance.Between(this.x, this.y, candidate.x, candidate.y);
       if (distance > range) continue;
-
       const candidateAngle = Phaser.Math.Angle.Between(this.x, this.y, candidate.x, candidate.y);
       const angleDelta = Math.abs(Phaser.Math.Angle.Wrap(candidateAngle - aimAngle));
       if (angleDelta > coneAngle / 2) continue;
@@ -391,8 +425,7 @@ export class Weapon {
       const closeness = Phaser.Math.Clamp(1 - distance / range, 0, 1);
       const hitRatio = 0.25 + 0.75 * closeness;
       const pelletsHit = Phaser.Math.Clamp(Math.round(pelletCount * hitRatio), 1, pelletCount);
-      const baseDamage = this.getDamage() * pelletsHit;
-      DamageSystem.apply(candidate, this.getDamageContext(baseDamage, targets));
+      DamageSystem.apply(candidate, this.getDamageContext(this.getDamage() * pelletsHit, targets));
     }
 
     const graphics = this.scene.add.graphics().setDepth(4);
@@ -409,15 +442,12 @@ export class Weapon {
   }
 
   private fireGrenade(target: Targetable): void {
-    const x = target.x;
-    const y = target.y;
-    const marker = this.scene.add.circle(x, y, 18, this.definition.color, 0.35)
+    const marker = this.scene.add.circle(target.x, target.y, 18, this.definition.color, 0.35)
       .setStrokeStyle(4, this.definition.color, 0.85)
       .setDepth(3);
-
     this.pendingGrenades.push({
-      x,
-      y,
+      x: target.x,
+      y: target.y,
       timerMs: (this.definition.impactDelayMs ?? 800) * (this.branchEffect.impactDelayMultiplier ?? 1),
       burstsRemaining: Math.max(1, Math.round(this.branchEffect.grenadeBursts ?? 1)),
       marker,
@@ -429,7 +459,6 @@ export class Weapon {
       const grenade = this.pendingGrenades[index];
       grenade.timerMs -= deltaMs;
       if (grenade.timerMs > 0) continue;
-
       const radius = (this.definition.aoeRadius ?? 120) * (this.branchEffect.aoeRadiusMultiplier ?? 1);
 
       for (const target of targets) {
@@ -440,7 +469,6 @@ export class Weapon {
       }
 
       this.drawExplosion(grenade.x, grenade.y, radius);
-
       if (grenade.burstsRemaining > 1) {
         grenade.burstsRemaining -= 1;
         grenade.timerMs = 180;
@@ -449,7 +477,6 @@ export class Weapon {
         grenade.marker.setPosition(grenade.x, grenade.y);
         continue;
       }
-
       grenade.marker.destroy();
       this.pendingGrenades.splice(index, 1);
     }
@@ -459,13 +486,7 @@ export class Weapon {
     const blast = this.scene.add.circle(x, y, radius, this.definition.color, 0.25)
       .setStrokeStyle(5, this.definition.color, 0.8)
       .setDepth(5);
-    this.scene.tweens.add({
-      targets: blast,
-      scale: 1.2,
-      alpha: 0,
-      duration: 180,
-      onComplete: () => blast.destroy(),
-    });
+    this.scene.tweens.add({ targets: blast, scale: 1.2, alpha: 0, duration: 180, onComplete: () => blast.destroy() });
   }
 
   private fireTesla(primary: Targetable, targets: readonly Targetable[]): void {
@@ -479,10 +500,8 @@ export class Weapon {
     for (let index = 0; index < chainCount && current; index += 1) {
       const hitTarget: Targetable = current;
       hitIds.add(hitTarget.id);
-      const baseDamage = this.getDamage() * Math.pow(0.85, index);
-      DamageSystem.apply(hitTarget, this.getDamageContext(baseDamage, targets));
+      DamageSystem.apply(hitTarget, this.getDamageContext(this.getDamage() * Math.pow(0.85, index), targets));
       this.drawTeslaArc(fromX, fromY, hitTarget.x, hitTarget.y);
-
       fromX = hitTarget.x;
       fromY = hitTarget.y;
       current = TargetingSystem.findNearestTarget(
@@ -498,7 +517,6 @@ export class Weapon {
 
   private fireTeslaRadial(targets: readonly Targetable[]): void {
     const range = this.getRange();
-
     for (const target of targets) {
       if (!TargetingSystem.canTarget(target, this.definition.targetDomains)) continue;
       if (Phaser.Math.Distance.Between(this.x, this.y, target.x, target.y) > range) continue;
@@ -523,14 +541,26 @@ export class Weapon {
 
   private startReload(): void {
     this.state = 'RELOADING';
-    const reloadSpeedMultiplier = this.branchEffect.reloadSpeedMultiplier ?? 1;
-    this.reloadTimerMs = this.definition.reloadTimeMs / reloadSpeedMultiplier;
+    this.reloadTimerMs = this.definition.reloadTimeMs / (this.branchEffect.reloadSpeedMultiplier ?? 1);
+  }
+
+  private tryReactivate(): void {
+    if (!this.disabledValue) return;
+    if (this.hpValue < this.maxHp * 0.25) return;
+    this.disabledValue = false;
+    this.state = 'TARGETING';
+    this.setDisabledVisual(false);
+  }
+
+  private setDisabledVisual(disabled: boolean): void {
+    const alpha = disabled ? 0.35 : 1;
+    this.mount.setAlpha(alpha);
+    this.barrel.setAlpha(alpha);
   }
 
   private recordFocus(target: Targetable): void {
-    if (this.focusTargetId === target.id) {
-      this.focusShotCount += 1;
-    } else {
+    if (this.focusTargetId === target.id) this.focusShotCount += 1;
+    else {
       this.focusTargetId = target.id;
       this.focusShotCount = 1;
     }
