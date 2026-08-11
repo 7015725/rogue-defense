@@ -1,5 +1,8 @@
 export type Team = 'player' | 'enemy';
 
+export type ArmorGrade = 'UNARMORED' | 'LIGHT' | 'MEDIUM' | 'HEAVY';
+export type EnemyKind = 'infantry' | 'heavy' | 'boss';
+
 export interface DamageContext {
   baseDamage: number;
   critChance: number;
@@ -20,10 +23,25 @@ export interface Targetable {
   readonly alive: boolean;
   readonly pathProgress: number;
   readonly armor: number;
+  readonly armorGrade: ArmorGrade;
   readonly currentHp: number;
   readonly maxHp: number;
   takeDamage(amount: number): void;
   applyStun(durationMs: number): void;
+  applyArmorBreak(amount: number, durationMs: number): void;
+}
+
+export interface EnemyDefinition {
+  readonly hp: number;
+  readonly armor: number;
+  readonly armorGrade: ArmorGrade;
+  readonly moveSpeed: number;
+  readonly attackDamage: number;
+  readonly attackIntervalMs: number;
+  readonly xp: number;
+  readonly credits: number;
+  readonly size: number;
+  readonly color: number;
 }
 
 export type WeaponMode = 'projectile' | 'shotgun' | 'grenade' | 'tesla' | 'tesla-radial';
