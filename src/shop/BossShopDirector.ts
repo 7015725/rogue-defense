@@ -174,8 +174,7 @@ export class BossShopDirector {
     const weapons = new Set(context.weapons.map((weapon) => weapon.id));
     const result: ComboId[] = [];
 
-    if (!active.has('DETONATION') && weapons.has('shotgun') && weapons.has('auto-gl')) result.push('DETONATION');
-    if (!active.has('CONCUSSIVE_BREAK') && weapons.has('tesla') && (weapons.has('sniper') || weapons.has('shotgun'))) result.push('CONCUSSIVE_BREAK');
+    if (!active.has('CONCUSSIVE_BREAK') && weapons.has('tesla') && weapons.has('sniper')) result.push('CONCUSSIVE_BREAK');
     if (!active.has('OVERLOAD') && weapons.has('tesla')) result.push('OVERLOAD');
     if (!active.has('CONTROL_EXECUTION') && weapons.has('tesla') && weapons.has('sniper')) result.push('CONTROL_EXECUTION');
     return result;
