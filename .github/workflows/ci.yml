@@ -70,6 +70,7 @@ jobs:
           exit 0
 
       - name: Upload validated web RC
+        id: artifact
         if: steps.build.outputs.exit_code == '0' && steps.smoke.outputs.exit_code == '0'
         uses: actions/upload-artifact@v7
         with:
@@ -88,6 +89,7 @@ jobs:
           BUILD_ERROR: ${{ steps.build.outputs.error_line }}
           SMOKE_EXIT: ${{ steps.smoke.outputs.exit_code }}
           SMOKE_ERROR: ${{ steps.smoke.outputs.error_line }}
+          ARTIFACT_OUTCOME: ${{ steps.artifact.outcome }}
         run: |
           publish_status() {
             local state="$1"
@@ -116,6 +118,14 @@ jobs:
             publish_status error "ci/smoke" "Skipped because build failed"
           fi
 
+          if [ "$ARTIFACT_OUTCOME" = "success" ]; then
+            publish_status success "ci/artifact" "V0.1 RC dist artifact uploaded"
+          elif [ "$BUILD_EXIT" = "0" ] && [ "$SMOKE_EXIT" = "0" ]; then
+            publish_status failure "ci/artifact" "V0.1 RC artifact upload failed"
+          else
+            publish_status error "ci/artifact" "Skipped because validation failed"
+          fi
+
           ERROR_LINE="$BUILD_ERROR"
           if [ -z "$ERROR_LINE" ]; then ERROR_LINE="$SMOKE_ERROR"; fi
           if [ -n "$ERROR_LINE" ]; then
@@ -124,5 +134,5 @@ jobs:
           fi
 
       - name: Fail job when validation failed
-        if: steps.build.outputs.exit_code != '0' || steps.smoke.outputs.exit_code != '0'
+        if: steps.build.outputs.exit_code != '0' || steps.smoke.outputs.exit_code != '0' || steps.artifact.outcome != 'success'
         run: exit 1
