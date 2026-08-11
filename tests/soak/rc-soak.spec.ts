@@ -136,40 +136,33 @@ test('RC checkpoint soak validates W10-W100 Boss Shop chain and W101 difficulty 
   expect(save.lifetime?.runs).toBe(1);
 });
 
-async function startStressScene(page: Page, wave: 1 | 50 | 100): Promise<void> {
-  await page.evaluate((startWave) => {
-    const game = (window as unknown as {
-      __rogueDefenseGame?: {
-        scene: {
-          stop: (key: string) => void;
-          start: (key: string, data?: Record<string, number>) => void;
-        };
-      };
-    }).__rogueDefenseGame;
-    if (!game) throw new Error('DEV Phaser game probe unavailable');
-    game.scene.stop('CombatScene');
-    game.scene.start('CombatScene', { difficulty: 1, startWave, stressCount: 300 });
-  }, wave);
-
-  await expect.poll(async () => page.evaluate(() => {
-    const game = (window as unknown as {
-      __rogueDefenseGame?: { scene: { getScene: (key: string) => unknown } };
-    }).__rogueDefenseGame;
-    const combat = game?.scene.getScene('CombatScene') as { enemies?: unknown[] } | undefined;
-    return combat?.enemies?.length ?? 0;
-  })).toBeGreaterThanOrEqual(300);
+async function selectDevWave(page: Page, wave: 1 | 50 | 100): Promise<void> {
+  if (wave === 50) await clickLogical(page, 700, 322);
+  if (wave === 100) await clickLogical(page, 910, 322);
 }
 
-async function sampleRafFps(page: Page): Promise<number> {
+async function measureStressFps(page: Page, wave: 1 | 50 | 100): Promise<number> {
+  await page.setViewportSize({ width: 1000, height: 1600 });
+  await page.goto('/?dev=1');
+  const app = page.locator('#app');
+  await expect(app).toHaveAttribute('data-scene', 'menu');
+  await selectDevWave(page, wave);
+  await clickLogical(page, 910, 378);
+  await clickLogical(page, 500, 675);
+  await expect(app).toHaveAttribute('data-scene', 'combat');
+  await expect.poll(async () => Number(await app.getAttribute('data-enemy-count'))).toBeGreaterThanOrEqual(300);
+
   return page.evaluate(() => new Promise<number>((resolve) => {
     const frameTimes: number[] = [];
     let previous = performance.now();
     let finished = false;
+
     const finish = (value: number): void => {
       if (finished) return;
       finished = true;
       resolve(value);
     };
+
     const safety = window.setTimeout(() => finish(0), 5000);
     const sample = (now: number): void => {
       if (finished) return;
@@ -188,16 +181,13 @@ async function sampleRafFps(page: Page): Promise<number> {
   }));
 }
 
-test('Stress300 automated Chromium baseline remains responsive at W1/W50/W100', async ({ page }) => {
+test('Stress300 automated Chromium baseline remains responsive at W1/W50/W100', async ({ browser }) => {
   test.setTimeout(45_000);
-  await page.setViewportSize({ width: 1000, height: 1600 });
-  await page.goto('/?dev=1');
-  await expect(page.locator('#app')).toHaveAttribute('data-scene', 'menu');
-
   const metrics: Record<string, number> = {};
   for (const wave of [1, 50, 100] as const) {
-    await startStressScene(page, wave);
-    metrics[`W${wave}`] = await sampleRafFps(page);
+    const page = await browser.newPage();
+    metrics[`W${wave}`] = await measureStressFps(page, wave);
+    await page.close();
   }
 
   mkdirSync('test-results', { recursive: true });
