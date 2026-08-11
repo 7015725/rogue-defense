@@ -46,7 +46,8 @@ export class RunState {
   }
 
   getSkipReward(): number {
-    return 25 + 5 * Math.max(0, this.levelValue - 2);
+    const previousReward = 25 + 5 * Math.max(0, this.levelValue - 2);
+    return Math.max(1, Math.round(previousReward * 0.5));
   }
 
   private addXp(amount: number): void {
