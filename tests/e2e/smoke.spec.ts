@@ -6,6 +6,27 @@ const LOGICAL_HEIGHT = 1600;
 async function clickLogical(page: Page, x: number, y: number): Promise<void> {
   const canvas = page.locator('canvas');
   await expect(canvas).toBeVisible();
+
+  const transformed = await page.evaluate(({ logicalX, logicalY }) => {
+    type ScaleProbe = {
+      updateBounds: () => void;
+      canvasBounds: { x: number; y: number };
+      displayScale: { x: number; y: number };
+    };
+    const game = (window as Window & { __rogueDefenseGame?: { scale: ScaleProbe } }).__rogueDefenseGame;
+    if (!game) return null;
+    game.scale.updateBounds();
+    return {
+      x: game.scale.canvasBounds.x + logicalX / game.scale.displayScale.x,
+      y: game.scale.canvasBounds.y + logicalY / game.scale.displayScale.y,
+    };
+  }, { logicalX: x, logicalY: y });
+
+  if (transformed) {
+    await page.mouse.click(transformed.x, transformed.y);
+    return;
+  }
+
   const box = await canvas.boundingBox();
   if (!box) throw new Error('Canvas has no bounding box');
   await page.mouse.click(
@@ -85,7 +106,7 @@ test('DEV W100 + Stress 300 reaches combat and does not persist settlement', asy
   expect(errors).toEqual([]);
 });
 
-test('mobile portrait viewport fits canvas and starts with touch input', async ({ page }) => {
+test('mobile portrait viewport fills canvas and starts with touch input', async ({ page }) => {
   const errors = collectBrowserErrors(page);
   await page.setViewportSize({ width: 390, height: 844 });
   await page.goto('/?dev=1');
@@ -97,6 +118,10 @@ test('mobile portrait viewport fits canvas and starts with touch input', async (
 
   const box = await canvas.boundingBox();
   expect(box).not.toBeNull();
+  expect(box?.x ?? 9999).toBeLessThanOrEqual(2);
+  expect(box?.y ?? 9999).toBeLessThanOrEqual(2);
+  expect(box?.width ?? 0).toBeGreaterThanOrEqual(388);
+  expect(box?.height ?? 0).toBeGreaterThanOrEqual(842);
   expect(box?.width ?? 9999).toBeLessThanOrEqual(390);
   expect(box?.height ?? 9999).toBeLessThanOrEqual(844);
 
