@@ -1,5 +1,6 @@
 import * as Phaser from 'phaser';
 import { BATTLEFIELD_WIDTH } from '../combat/constants';
+import { isRuntimeProbeEnabled, publishRuntimeProbe } from '../dev/RuntimeProbe';
 import {
   DIFFICULTIES,
   getAccountXpToNext,
@@ -13,8 +14,7 @@ const DEV_WAVE_PRESETS = [1, 10, 20, 50, 80, 100] as const;
 export class MainMenuScene extends Phaser.Scene {
   private save!: PermanentSave;
   private root!: Phaser.GameObjects.Container;
-  private readonly devToolsEnabled = import.meta.env.DEV
-    || new URLSearchParams(window.location.search).get('dev') === '1';
+  private readonly devToolsEnabled = isRuntimeProbeEnabled();
   private devStartWave = 1;
   private devStressCount = 0;
 
@@ -31,6 +31,12 @@ export class MainMenuScene extends Phaser.Scene {
   private render(): void {
     this.root?.destroy(true);
     this.root = this.add.container(0, 0);
+
+    publishRuntimeProbe({
+      scene: 'menu',
+      startWave: this.devStartWave,
+      stressCount: this.devStressCount,
+    });
 
     this.root.add(this.add.text(BATTLEFIELD_WIDTH / 2, 95, 'ROGUE DEFENSE', {
       fontFamily: 'monospace',
@@ -179,7 +185,7 @@ export class MainMenuScene extends Phaser.Scene {
 
     this.addSmallButton(
       910,
-      350,
+      378,
       160,
       42,
       this.devStressCount > 0 ? 'Stress 300 ON' : 'Stress 300 OFF',
