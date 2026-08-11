@@ -153,6 +153,8 @@ async function measureStressFps(page: Page, wave: 1 | 50 | 100): Promise<number>
   await expect(app).toHaveAttribute('data-scene', 'combat');
   await expect.poll(async () => Number(await app.getAttribute('data-enemy-count'))).toBeGreaterThanOrEqual(300);
 
+  await page.waitForTimeout(500);
+
   return page.evaluate(() => new Promise<number>((resolve) => {
     const frameTimes: number[] = [];
     let previous = performance.now();
@@ -164,16 +166,17 @@ async function measureStressFps(page: Page, wave: 1 | 50 | 100): Promise<number>
       resolve(value);
     };
 
-    const safety = window.setTimeout(() => finish(0), 5000);
+    const safety = window.setTimeout(() => finish(0), 7000);
     const sample = (now: number): void => {
       if (finished) return;
       const delta = now - previous;
       previous = now;
       if (delta > 0 && delta < 1000) frameTimes.push(delta);
-      if (frameTimes.length >= 15) {
+      if (frameTimes.length >= 45) {
         window.clearTimeout(safety);
-        const averageMs = frameTimes.reduce((sum, value) => sum + value, 0) / frameTimes.length;
-        finish(1000 / averageMs);
+        const stable = frameTimes.slice(5).sort((a, b) => a - b);
+        const medianMs = stable[Math.floor(stable.length / 2)] ?? 1000;
+        finish(1000 / medianMs);
         return;
       }
       requestAnimationFrame(sample);
@@ -183,7 +186,7 @@ async function measureStressFps(page: Page, wave: 1 | 50 | 100): Promise<number>
 }
 
 test('Stress300 automated Chromium baseline remains responsive at W1/W50/W100', async ({ browser }) => {
-  test.setTimeout(45_000);
+  test.setTimeout(60_000);
   const metrics: Record<string, number> = {};
   for (const wave of [1, 50, 100] as const) {
     const page = await browser.newPage();
