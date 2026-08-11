@@ -10,6 +10,12 @@ interface WeaponHudProbe {
   canTargetAir: boolean;
 }
 
+interface SpeedButtonProbe {
+  speed: number;
+  button: Phaser.GameObjects.Rectangle;
+  text: Phaser.GameObjects.Text;
+}
+
 interface CombatHudProbe {
   waveManager?: {
     wave: number;
@@ -21,6 +27,7 @@ interface CombatHudProbe {
   projectilePool?: { activeCount: number; size: number };
   weapons?: WeaponHudProbe[];
   activeCombos?: Set<unknown>;
+  speedButtons?: SpeedButtonProbe[];
   gameSpeed?: number;
   maxGameSpeed?: number;
   kills?: number;
@@ -28,12 +35,15 @@ interface CombatHudProbe {
   debugRun?: boolean;
   debugStartWave?: number;
   debugStressCount?: number;
+  setGameSpeed?: (speed: number) => void;
+  updateUi?: () => void;
 }
 
 const COMPACT_HUD_REFRESH_MS = 250;
 const BOTTOM_PANEL_RIGHT = 970;
 const BOTTOM_PANEL_LEFT = 30;
 const BOTTOM_PANEL_BOTTOM = 1355;
+const PLAYTEST_SPEEDS = [1, 3, 5, 7, 9] as const;
 
 function findText(scene: Phaser.Scene, predicate: (value: string) => boolean): Phaser.GameObjects.Text | null {
   for (const child of scene.children.list) {
@@ -48,6 +58,58 @@ function hideBattlefieldLabels(scene: Phaser.Scene): void {
     if (!(child instanceof Phaser.GameObjects.Text)) continue;
     if (child.text === 'AIR PATH · W20+' || child.text === 'BASE ATTACK LINE') child.setVisible(false);
   }
+}
+
+function installPlaytestSpeedControls(scene: Phaser.Scene): void {
+  const combat = scene as unknown as CombatHudProbe;
+
+  for (const item of combat.speedButtons ?? []) {
+    item.button.disableInteractive().setVisible(false);
+    item.text.disableInteractive().setVisible(false);
+  }
+
+  const controls = PLAYTEST_SPEEDS.map((speed, index) => {
+    const x = 64 + index * 82;
+    const button = scene.add.rectangle(x, 330, 70, 58, 0x1f2937)
+      .setStrokeStyle(2, 0x64748b)
+      .setInteractive({ useHandCursor: true })
+      .setDepth(16);
+    const text = scene.add.text(x, 330, `${speed}×`, {
+      fontFamily: 'monospace',
+      fontSize: '20px',
+      color: '#e2e8f0',
+      fontStyle: 'bold',
+    }).setOrigin(0.5).setDepth(17);
+
+    const select = (): void => {
+      combat.setGameSpeed?.(speed);
+      combat.updateUi?.();
+      refresh();
+    };
+    button.on('pointerup', select);
+    text.setInteractive({ useHandCursor: true }).on('pointerup', select);
+    return { speed, button, text };
+  });
+
+  const refresh = (): void => {
+    const activeSpeed = combat.gameSpeed ?? 1;
+    for (const item of controls) {
+      const active = item.speed === activeSpeed;
+      item.button.setFillStyle(active ? 0x1d4ed8 : 0x1f2937);
+      item.button.setStrokeStyle(2, active ? 0x93c5fd : 0x64748b);
+      item.text.setColor(active ? '#eff6ff' : '#e2e8f0');
+    }
+  };
+
+  const keyboard = scene.input.keyboard;
+  keyboard?.on('keydown-ONE', () => { combat.setGameSpeed?.(1); refresh(); });
+  keyboard?.on('keydown-THREE', () => { combat.setGameSpeed?.(3); refresh(); });
+  keyboard?.on('keydown-FIVE', () => { combat.setGameSpeed?.(5); refresh(); });
+  keyboard?.on('keydown-SEVEN', () => { combat.setGameSpeed?.(7); refresh(); });
+  keyboard?.on('keydown-NINE', () => { combat.setGameSpeed?.(9); refresh(); });
+
+  refresh();
+  scene.time.addEvent({ delay: COMPACT_HUD_REFRESH_MS, loop: true, callback: refresh });
 }
 
 function installBottomHud(scene: Phaser.Scene): void {
@@ -141,6 +203,7 @@ function installCompactDebug(scene: Phaser.Scene): void {
 
 function applyCombatMobileLayout(scene: Phaser.Scene): void {
   hideBattlefieldLabels(scene);
+  installPlaytestSpeedControls(scene);
   installBottomHud(scene);
   installCompactDebug(scene);
 }
