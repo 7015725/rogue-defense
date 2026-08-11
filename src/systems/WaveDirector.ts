@@ -57,6 +57,11 @@ export class WaveDirector {
     };
   }
 
+  static getRewardMultiplier(wave: number): number {
+    const normalizedWave = Math.max(1, Math.floor(wave));
+    return Math.min(2.5, 1 + (normalizedWave - 1) * 0.01);
+  }
+
   static getBossEscortCount(wave: number): number {
     const normalizedWave = Math.max(1, Math.floor(wave));
     if (normalizedWave < 20) return 0;
