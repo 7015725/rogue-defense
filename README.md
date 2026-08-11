@@ -49,7 +49,11 @@ npm run build
 
 ## 文档
 
-完整设计总稿：[`docs/game-design-v0.2.md`](docs/game-design-v0.2.md)
+- [设计文档索引](docs/README.md)
+- [V0.2 游戏系统设计总稿](docs/game-design-v0.2.md)
+- [V0.1 升级卡池 V1](docs/upgrade-card-pool-v0.1.md)
+- [Upgrade Director V1](docs/upgrade-director-v1.md)
+- [Decision Log](docs/decision-log.md)
 
 ## 里程碑
 
