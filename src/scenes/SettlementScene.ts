@@ -107,7 +107,7 @@ export class SettlementScene extends Phaser.Scene {
     const button = this.add.rectangle(x, y, width, height, color)
       .setStrokeStyle(4, 0x94a3b8)
       .setInteractive({ useHandCursor: true });
-    const text = this.add.text(x, y, label, {
+    this.add.text(x, y, label, {
       fontFamily: 'monospace', fontSize: '28px', color: '#f8fafc', fontStyle: 'bold',
     }).setOrigin(0.5);
     button.on('pointerover', () => button.setAlpha(0.82));
