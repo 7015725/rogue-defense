@@ -75,7 +75,9 @@ export class Enemy implements Targetable {
     difficultyScale: EnemyDifficultyScale = { hpMultiplier: 1, damageMultiplier: 1 },
   ) {
     const stats = this.getDefinition(kind);
+    const spawnWave = WaveDirector.getActiveSpawnWave();
     const waveScale = WaveDirector.getActiveSpawnScaling();
+    const rewardMultiplier = WaveDirector.getRewardMultiplier(spawnWave);
     const hpMultiplier = Math.max(0.01, difficultyScale.hpMultiplier) * waveScale.hpMultiplier;
     const damageMultiplier = Math.max(0.01, difficultyScale.damageMultiplier) * waveScale.damageMultiplier;
 
@@ -87,7 +89,10 @@ export class Enemy implements Targetable {
     this.moveSpeed = stats.moveSpeed;
     this.attackDamage = stats.attackDamage * damageMultiplier;
     this.attackIntervalMs = stats.attackIntervalMs;
-    this.rewards = { xp: stats.xp, credits: stats.credits };
+    this.rewards = {
+      xp: Math.max(1, Math.round(stats.xp * rewardMultiplier)),
+      credits: Math.max(1, Math.round(stats.credits * rewardMultiplier)),
+    };
     this.statusEffects = new StatusEffectSystem(kind === 'boss', (amount) => this.takeDamage(amount));
 
     const laneOffsets = this.domain === 'AIR' ? AIR_LANE_OFFSETS : LANE_OFFSETS;
