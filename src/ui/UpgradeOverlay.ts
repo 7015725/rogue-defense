@@ -5,6 +5,7 @@ import type { UpgradeOption } from '../upgrades/UpgradeDirectorLite';
 export class UpgradeOverlay {
   private container: Phaser.GameObjects.Container | null = null;
   private choosing = false;
+  private optionIdsValue: string[] = [];
 
   constructor(
     private readonly scene: Phaser.Scene,
@@ -16,9 +17,14 @@ export class UpgradeOverlay {
     return this.container !== null;
   }
 
+  get optionIds(): readonly string[] {
+    return this.optionIdsValue;
+  }
+
   show(options: readonly UpgradeOption[], skipReward: number, rerollCharges: number): void {
     this.destroy();
     this.choosing = false;
+    this.optionIdsValue = options.map((option) => option.id);
 
     const container = this.scene.add.container(0, 0).setDepth(100);
     this.container = container;
@@ -86,6 +92,7 @@ export class UpgradeOverlay {
   destroy(): void {
     this.container?.destroy(true);
     this.container = null;
+    this.optionIdsValue = [];
   }
 
   private choose(option: UpgradeOption | null): void {
