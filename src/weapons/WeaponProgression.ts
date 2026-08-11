@@ -51,8 +51,8 @@ const c = (
 export const WEAPON_PROGRESSION: Readonly<Record<string, WeaponProgressionDefinition>> = {
   'auto-cannon': {
     lv5: [
-      c('a', 'α 长管精确化', '射程 +50% · 伤害 +40% · 弹速提高 · 射速 -25%', {
-        rangeMultiplier: 1.5, damageMultiplier: 1.4, projectileSpeedMultiplier: 1.25, attackSpeedMultiplier: 0.75,
+      c('a', 'α 长管精确化', '伤害 +40% · 弹速 +25% · 射速 -25%', {
+        damageMultiplier: 1.4, projectileSpeedMultiplier: 1.25, attackSpeedMultiplier: 0.75,
       }),
       c('b', 'β 双联自动炮', '每次同时发射 2 发 · 单发伤害降低', {
         multiShot: 2, damageMultiplier: 0.62,
@@ -81,8 +81,8 @@ export const WEAPON_PROGRESSION: Readonly<Record<string, WeaponProgressionDefini
   },
   lmg: {
     lv5: [
-      c('a', 'α 重型枪管', '射程 +50% · 伤害 +40% · 射速 -25%', {
-        rangeMultiplier: 1.5, damageMultiplier: 1.4, attackSpeedMultiplier: 0.75,
+      c('a', 'α 重型枪管', '伤害 +40% · 射速 -25%', {
+        damageMultiplier: 1.4, attackSpeedMultiplier: 0.75,
       }),
       c('b', 'β 双联装', '同时攻击 2 个目标 · 单发伤害降低', {
         multiShot: 2, splitTargets: true, damageMultiplier: 0.55,
@@ -100,43 +100,12 @@ export const WEAPON_PROGRESSION: Readonly<Record<string, WeaponProgressionDefini
       b: [
         c('b1', '独立火控', '双联射速 +20%', { attackSpeedMultiplier: 1.2 }),
         c('b2', '交叉火力', '暴击率 +10%', { critChanceBonus: 0.1 }),
-        c('b3', '弹幕覆盖', '射程 +20%', { rangeMultiplier: 1.2 }),
+        c('b3', '强化弹箱', '弹匣容量 +35%', { magazineMultiplier: 1.35 }),
       ],
       c: [
         c('c1', '超大弹箱', '弹匣容量 ×2', { magazineMultiplier: 2 }),
         c('c2', '快速换弹', 'Reload 速度 +70%', { reloadSpeedMultiplier: 1.7 }),
         c('c3', '红线射击', '攻击速度再 +35% · 伤害 +10%', { attackSpeedMultiplier: 1.35, damageMultiplier: 1.1 }),
-      ],
-    },
-  },
-  shotgun: {
-    lv5: [
-      c('a', 'α 龙息弹', '命中附加 Burn 5s · 最多 3 层 · 刷新持续时间', {
-        damageMultiplier: 1.2, coneAngleMultiplier: 1.1,
-      }),
-      c('b', 'β 独头弹', '改为高伤单发弹体 · 射程提高 · 获得穿甲', {
-        modeOverride: 'projectile', projectileSpeedOverride: 1500, damageMultiplier: 18, rangeMultiplier: 1.7,
-        attackSpeedMultiplier: 0.85, armorPenetrationBonus: 30,
-      }),
-      c('c', 'γ 全自动战斗霰弹', '射速大幅提高 · 24 发弹匣 · 单次伤害降低', {
-        attackSpeedMultiplier: 3.5, magazineMultiplier: 3, damageMultiplier: 0.5, coneAngleMultiplier: 0.9,
-      }),
-    ],
-    lv10: {
-      a: [
-        c('a1', '高温燃烧弹', '伤害 +30%', { damageMultiplier: 1.3 }),
-        c('a2', '火焰扩散', '锥形角度 +30%', { coneAngleMultiplier: 1.3 }),
-        c('a3', '爆燃弹药', '弹丸数量 +35%', { pelletCountMultiplier: 1.35 }),
-      ],
-      b: [
-        c('b1', '钨芯独头弹', 'Armor Penetration +50', { armorPenetrationBonus: 50 }),
-        c('b2', '震荡弹头', '伤害 +25%', { damageMultiplier: 1.25 }),
-        c('b3', '猎杀弹', '暴击率 +20% · 暴击倍率 +0.5', { critChanceBonus: 0.2, critMultiplierBonus: 0.5 }),
-      ],
-      c: [
-        c('c1', '鼓式弹匣', '弹匣容量 ×2', { magazineMultiplier: 2 }),
-        c('c2', '快速循环', '攻击速度 +25%', { attackSpeedMultiplier: 1.25 }),
-        c('c3', '扫射散布', '锥形角度 +20% · 弹丸数量 +20%', { coneAngleMultiplier: 1.2, pelletCountMultiplier: 1.2 }),
       ],
     },
   },
@@ -198,11 +167,11 @@ export const WEAPON_PROGRESSION: Readonly<Record<string, WeaponProgressionDefini
   },
   tesla: {
     lv5: [
-      c('a', 'α 高压电网', '伤害 +150% · Stun 提高到约 1s · 射程增加', {
-        damageMultiplier: 2.5, stunMsBonus: 700, rangeMultiplier: 1.15,
+      c('a', 'α 高压电网', '伤害 +150% · Stun 提高到约 1s · 连锁距离 +15%', {
+        damageMultiplier: 2.5, stunMsBonus: 700, chainRangeMultiplier: 1.15,
       }),
-      c('b', 'β 地面放电', '取消链式目标，改为自身周围径向 AOE', {
-        modeOverride: 'tesla-radial', damageMultiplier: 1.3, rangeMultiplier: 1.1,
+      c('b', 'β 分流电弧', '额外连锁 2 个目标 · 单次伤害 -15% · 连锁距离 +15%', {
+        chainCountBonus: 2, damageMultiplier: 0.85, chainRangeMultiplier: 1.15,
       }),
       c('c', 'γ 超导线圈', '攻击速度 +200% · 开启暴击构筑', {
         attackSpeedMultiplier: 3, damageMultiplier: 0.6, critChanceBonus: 0.15, critMultiplierBonus: 1.5,
@@ -215,7 +184,7 @@ export const WEAPON_PROGRESSION: Readonly<Record<string, WeaponProgressionDefini
         c('a3', '残余电荷', '伤害 +25%', { damageMultiplier: 1.25 }),
       ],
       b: [
-        c('b1', '扩展接地', '径向范围 +25%', { rangeMultiplier: 1.25 }),
+        c('b1', '扩展电网', '连锁距离 +30%', { chainRangeMultiplier: 1.3 }),
         c('b2', '脉冲震击', '攻击速度 +25%', { attackSpeedMultiplier: 1.25 }),
         c('b3', '残余电场', 'Stun +300ms', { stunMsBonus: 300 }),
       ],
