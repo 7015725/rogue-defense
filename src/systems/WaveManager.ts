@@ -8,7 +8,7 @@ import { WaveDirector, type WaveComposition } from './WaveDirector';
 export type SpawnRequest = { kind: EnemyKind; laneIndex: number };
 
 export class WaveManager {
-  private waveNumber = 1;
+  private waveNumber: number;
   private waveElapsedMs = 0;
   private spawnedThisWave = 0;
   private spawnedHeavyThisWave = 0;
@@ -18,6 +18,11 @@ export class WaveManager {
   private shopRequestedWave: number | null = null;
   private waitingForShop = false;
   private laneCursor = 0;
+
+  constructor(startWave = 1) {
+    this.waveNumber = this.normalizeWave(startWave);
+    WaveDirector.setActiveSpawnWave(this.waveNumber);
+  }
 
   get wave(): number { return this.waveNumber; }
   get isComplete(): boolean { return false; }
@@ -82,6 +87,18 @@ export class WaveManager {
     this.waveElapsedMs = 0;
     this.bossSpawned = false;
     this.resetRegularWaveCounters();
+    WaveDirector.setActiveSpawnWave(this.waveNumber);
+  }
+
+  debugJumpToWave(wave: number): void {
+    this.waveNumber = this.normalizeWave(wave);
+    this.waveElapsedMs = 0;
+    this.bossSpawned = false;
+    this.checkpointClearRequested = false;
+    this.shopRequestedWave = null;
+    this.waitingForShop = false;
+    this.resetRegularWaveCounters();
+    WaveDirector.setActiveSpawnWave(this.waveNumber);
   }
 
   private updateBossWave(bossAlive: boolean): SpawnRequest[] {
@@ -130,5 +147,10 @@ export class WaveManager {
     this.spawnedThisWave = 0;
     this.spawnedHeavyThisWave = 0;
     this.spawnedFlyingThisWave = 0;
+  }
+
+  private normalizeWave(wave: number): number {
+    if (!Number.isFinite(wave)) return 1;
+    return Math.max(1, Math.min(9999, Math.floor(wave)));
   }
 }
