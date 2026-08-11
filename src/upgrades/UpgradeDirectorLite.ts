@@ -29,6 +29,7 @@ export interface OwnedWeaponSnapshot {
 
 export interface UpgradeContext {
   runLevel: number;
+  currentWave: number;
   ownedWeapons: readonly OwnedWeaponSnapshot[];
   ownedRandomWeaponIds: readonly RandomWeaponId[];
   globalDamageLevel: number;
@@ -64,15 +65,18 @@ const BASE_OPTIONS: readonly UpgradeOption[] = [
 ];
 
 const WEAPON_DESCRIPTIONS: Record<RandomWeaponId, string> = {
-  lmg: '高频持续火力\n独立弹匣与 Reload',
-  shotgun: '近距离锥形 AOE\n越靠近命中弹丸越多',
-  sniper: '全场高伤单体\n优先最高 HP 目标',
-  'auto-gl': '延迟落点爆炸\n中距离范围伤害',
-  tesla: '短距连锁电击\n3 目标 + 轻量 Stun',
+  lmg: '高频持续火力 · 可对空\n独立弹匣与 Reload',
+  shotgun: '近距离锥形 AOE · 仅地面\n越靠近命中弹丸越多',
+  sniper: '全场高伤单体 · 可对空\n优先最高 HP 目标',
+  'auto-gl': '延迟落点爆炸 · 仅地面\n中距离范围伤害',
+  tesla: '短距连锁电击 · 仅地面\n3 目标 + 轻量 Stun',
 };
+
+const SECONDARY_AA_IDS = new Set<RandomWeaponId>(['lmg', 'sniper']);
 
 export class UpgradeDirectorLite {
   private weaponOfferCount = 0;
+  private antiAirOfferCount = 0;
 
   generate(context: UpgradeContext): UpgradeOption[] {
     const baseEligible = BASE_OPTIONS.filter((option) => this.isBaseEligible(option.kind, context));
@@ -81,9 +85,23 @@ export class UpgradeDirectorLite {
     const eligible = [...baseEligible, ...levelOptions, ...unlockOptions];
     const selected: UpgradeOption[] = [];
 
+    const hasSecondaryAa = context.ownedRandomWeaponIds.some((id) => SECONDARY_AA_IDS.has(id));
+    const aaUnlockOptions = unlockOptions.filter(
+      (option) => option.weaponId && SECONDARY_AA_IDS.has(option.weaponId as RandomWeaponId),
+    );
+    const forceAaOffer = context.currentWave >= 18
+      && !hasSecondaryAa
+      && this.antiAirOfferCount === 0
+      && aaUnlockOptions.length > 0;
+
+    if (forceAaOffer) {
+      selected.push(aaUnlockOptions[Math.floor(Math.random() * aaUnlockOptions.length)]);
+    }
+
     const forceFirstWeapon = context.ownedRandomWeaponIds.length === 0
       && context.runLevel >= 4
-      && this.weaponOfferCount === 0;
+      && this.weaponOfferCount === 0
+      && !selected.some((option) => option.kind === 'unlock-weapon');
 
     if (forceFirstWeapon && unlockOptions.length > 0) {
       selected.push(unlockOptions[Math.floor(Math.random() * unlockOptions.length)]);
@@ -103,6 +121,9 @@ export class UpgradeDirectorLite {
     }
 
     if (selected.some((option) => option.kind === 'unlock-weapon')) this.weaponOfferCount += 1;
+    if (selected.some((option) => option.weaponId && SECONDARY_AA_IDS.has(option.weaponId as RandomWeaponId))) {
+      this.antiAirOfferCount += 1;
+    }
     return selected;
   }
 
@@ -134,19 +155,25 @@ export class UpgradeDirectorLite {
     if (context.runLevel < 2 || context.ownedRandomWeaponIds.length >= 4) return [];
 
     const owned = new Set<RandomWeaponId>(context.ownedRandomWeaponIds);
-    const weight = context.runLevel >= 3 ? 7 : 3;
+    const hasSecondaryAa = context.ownedRandomWeaponIds.some((id) => SECONDARY_AA_IDS.has(id));
+    const baseWeight = context.runLevel >= 3 ? 7 : 3;
 
     return RANDOM_WEAPON_IDS
       .filter((weaponId) => !owned.has(weaponId))
-      .map((weaponId) => ({
-        id: `unlock:${weaponId}`,
-        kind: 'unlock-weapon' as const,
-        title: RANDOM_WEAPON_DEFINITIONS[weaponId].name,
-        description: WEAPON_DESCRIPTIONS[weaponId],
-        rarity: 'RARE' as const,
-        weight,
-        weaponId,
-      }));
+      .map((weaponId) => {
+        const antiAirBoost = context.currentWave >= 15 && !hasSecondaryAa && SECONDARY_AA_IDS.has(weaponId)
+          ? 3
+          : 1;
+        return {
+          id: `unlock:${weaponId}`,
+          kind: 'unlock-weapon' as const,
+          title: RANDOM_WEAPON_DEFINITIONS[weaponId].name,
+          description: WEAPON_DESCRIPTIONS[weaponId],
+          rarity: 'RARE' as const,
+          weight: baseWeight * antiAirBoost,
+          weaponId,
+        };
+      });
   }
 
   private isBaseEligible(kind: UpgradeKind, context: UpgradeContext): boolean {
