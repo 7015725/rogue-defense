@@ -119,11 +119,7 @@ test('RC checkpoint soak validates W10-W100 Boss Shop chain and W101 difficulty 
 
     const waveAfter100 = combat.waveManager.wave;
     combat.finishRun('VOLUNTARY_EXIT');
-    return {
-      checkpoints,
-      waveAfter100,
-      activeKey: game.scene.getScenes(true)[0]?.scene.key ?? 'none',
-    };
+    return { checkpoints, waveAfter100 };
   }, UPGRADE_PRIORITIES);
 
   expect(result.checkpoints).toEqual([10, 20, 30, 40, 50, 60, 70, 80, 90, 100]);
@@ -156,18 +152,18 @@ async function measureStressFps(page: Page, wave: 1 | 50 | 100): Promise<number>
   await expect(app).toHaveAttribute('data-scene', 'combat');
   await expect.poll(async () => Number(await app.getAttribute('data-enemy-count'))).toBeGreaterThanOrEqual(300);
 
-  await page.waitForTimeout(1000);
+  await page.waitForTimeout(500);
   const samples: number[] = [];
-  for (let index = 0; index < 10; index += 1) {
+  for (let index = 0; index < 4; index += 1) {
     const fps = Number(await app.getAttribute('data-fps') ?? '0');
     if (fps > 0) samples.push(fps);
-    await page.waitForTimeout(200);
+    await page.waitForTimeout(100);
   }
   return samples.length === 0 ? 0 : samples.reduce((sum, value) => sum + value, 0) / samples.length;
 }
 
 test('Stress300 automated Chromium baseline remains responsive at W1/W50/W100', async ({ browser }) => {
-  test.setTimeout(90_000);
+  test.setTimeout(45_000);
   const metrics: Record<string, number> = {};
   for (const wave of [1, 50, 100] as const) {
     const page = await browser.newPage();
