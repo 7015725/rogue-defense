@@ -1,5 +1,6 @@
 import type { DamageContext, DamageResult, Targetable } from '../combat/types';
 import { ArmorSystem } from './ArmorSystem';
+import { ComboSystem } from './ComboSystem';
 
 export class DamageSystem {
   static calculate(target: Targetable, context: DamageContext): DamageResult {
@@ -15,6 +16,17 @@ export class DamageSystem {
   static apply(target: Targetable, context: DamageContext): DamageResult {
     const result = this.calculate(target, context);
     target.takeDamage(result.finalDamage);
+
+    if (target.alive) {
+      ComboSystem.resolveAfterHit(target, context, result);
+    }
+
+    if (target.alive) {
+      for (const application of context.statusApplications ?? []) {
+        target.applyStatus(application);
+      }
+    }
+
     return result;
   }
 }
