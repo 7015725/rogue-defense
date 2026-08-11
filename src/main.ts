@@ -5,6 +5,7 @@ import { isRuntimeProbeEnabled, publishRuntimeProbe } from './dev/RuntimeProbe';
 import { CombatScene } from './scenes/CombatScene';
 import { MainMenuScene } from './scenes/MainMenuScene';
 import { SettlementScene } from './scenes/SettlementScene';
+import { installChineseLocalization } from './ui/ChineseLocalization';
 import { installCombatMobileLayout } from './ui/CombatMobileLayout';
 
 const config: Phaser.Types.Core.GameConfig = {
@@ -26,6 +27,7 @@ const config: Phaser.Types.Core.GameConfig = {
 };
 
 const game = new Phaser.Game(config);
+installChineseLocalization(game);
 installCombatMobileLayout(game);
 
 if (isRuntimeProbeEnabled()) {
