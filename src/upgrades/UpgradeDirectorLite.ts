@@ -4,26 +4,33 @@ import {
   type RandomWeaponId,
 } from '../combat/constants';
 
-export type UpgradeId =
+export type UpgradeKind =
   | 'global-damage'
   | 'global-attack-speed'
   | 'base-max-hp'
-  | 'auto-cannon-level'
-  | `unlock-${RandomWeaponId}`;
+  | 'weapon-level'
+  | 'unlock-weapon';
 
 export interface UpgradeOption {
-  id: UpgradeId;
+  id: string;
+  kind: UpgradeKind;
   title: string;
   description: string;
   rarity: 'COMMON' | 'RARE';
   weight: number;
-  weaponId?: RandomWeaponId;
+  weaponId?: string;
+}
+
+export interface OwnedWeaponSnapshot {
+  id: string;
+  name: string;
+  level: number;
 }
 
 export interface UpgradeContext {
   runLevel: number;
-  ownedWeaponIds: readonly RandomWeaponId[];
-  autoCannonLevel: number;
+  ownedWeapons: readonly OwnedWeaponSnapshot[];
+  ownedRandomWeaponIds: readonly RandomWeaponId[];
   globalDamageLevel: number;
   globalAttackSpeedLevel: number;
   baseHpUpgradeLevel: number;
@@ -32,6 +39,7 @@ export interface UpgradeContext {
 const BASE_OPTIONS: readonly UpgradeOption[] = [
   {
     id: 'global-damage',
+    kind: 'global-damage',
     title: '强化弹药',
     description: '所有武器伤害 +10%',
     rarity: 'COMMON',
@@ -39,6 +47,7 @@ const BASE_OPTIONS: readonly UpgradeOption[] = [
   },
   {
     id: 'global-attack-speed',
+    kind: 'global-attack-speed',
     title: '快速循环',
     description: '所有武器攻击速度 +8%',
     rarity: 'COMMON',
@@ -46,17 +55,11 @@ const BASE_OPTIONS: readonly UpgradeOption[] = [
   },
   {
     id: 'base-max-hp',
+    kind: 'base-max-hp',
     title: '加固基地',
     description: '基地最大生命 +12%\n并增加等量当前生命',
     rarity: 'COMMON',
     weight: 8,
-  },
-  {
-    id: 'auto-cannon-level',
-    title: '自动炮升级',
-    description: 'Auto Cannon +1 Lv\n每级提高伤害与攻击速度',
-    rarity: 'COMMON',
-    weight: 12,
   },
 ];
 
@@ -72,46 +75,72 @@ export class UpgradeDirectorLite {
   private weaponOfferCount = 0;
 
   generate(context: UpgradeContext): UpgradeOption[] {
-    const baseEligible = BASE_OPTIONS.filter((option) => this.isEligible(option.id, context));
-    const weaponOptions = this.buildWeaponOptions(context);
-    const eligible = [...baseEligible, ...weaponOptions];
+    const baseEligible = BASE_OPTIONS.filter((option) => this.isBaseEligible(option.kind, context));
+    const levelOptions = this.buildWeaponLevelOptions(context);
+    const unlockOptions = this.buildWeaponUnlockOptions(context);
+    const eligible = [...baseEligible, ...levelOptions, ...unlockOptions];
     const selected: UpgradeOption[] = [];
 
-    const forceFirstWeapon = context.ownedWeaponIds.length === 0
+    const forceFirstWeapon = context.ownedRandomWeaponIds.length === 0
       && context.runLevel >= 4
       && this.weaponOfferCount === 0;
 
-    if (forceFirstWeapon && weaponOptions.length > 0) {
-      selected.push(weaponOptions[Math.floor(Math.random() * weaponOptions.length)]);
+    if (forceFirstWeapon && unlockOptions.length > 0) {
+      selected.push(unlockOptions[Math.floor(Math.random() * unlockOptions.length)]);
     }
 
     const remaining = eligible.filter((option) => !selected.some((picked) => picked.id === option.id));
 
     while (selected.length < 3 && remaining.length > 0) {
-      const alreadyHasWeaponOffer = selected.some((option) => option.weaponId !== undefined);
+      const alreadyHasWeaponCategory = selected.some((option) => this.isWeaponCategory(option));
       const weighted = remaining.map((option) => ({
         ...option,
-        weight: option.weaponId && alreadyHasWeaponOffer ? option.weight * 0.35 : option.weight,
+        weight: this.isWeaponCategory(option) && alreadyHasWeaponCategory ? option.weight * 0.35 : option.weight,
       }));
       const picked = this.pickWeighted(weighted);
       selected.push(picked);
       remaining.splice(remaining.findIndex((option) => option.id === picked.id), 1);
     }
 
-    if (selected.some((option) => option.weaponId !== undefined)) this.weaponOfferCount += 1;
+    if (selected.some((option) => option.kind === 'unlock-weapon')) this.weaponOfferCount += 1;
     return selected;
   }
 
-  private buildWeaponOptions(context: UpgradeContext): UpgradeOption[] {
-    if (context.runLevel < 2 || context.ownedWeaponIds.length >= 4) return [];
+  private buildWeaponLevelOptions(context: UpgradeContext): UpgradeOption[] {
+    return context.ownedWeapons
+      .filter((weapon) => weapon.level < 10)
+      .map((weapon) => {
+        const milestoneBoost = weapon.level === 4 || weapon.level === 9 ? 1.15 : 1;
+        const nextLevel = weapon.level + 1;
+        const milestone = nextLevel === 5
+          ? '\n达到 Lv5 后立即选择 α / β / γ 路线'
+          : nextLevel === 10
+            ? '\n达到 Lv10 后立即选择路线专精'
+            : '';
 
-    const owned = new Set<RandomWeaponId>(context.ownedWeaponIds);
+        return {
+          id: `weapon-level:${weapon.id}`,
+          kind: 'weapon-level' as const,
+          title: `${weapon.name} +1 Lv`,
+          description: `Lv${weapon.level} → Lv${nextLevel}${milestone}`,
+          rarity: 'COMMON' as const,
+          weight: 12 * milestoneBoost,
+          weaponId: weapon.id,
+        };
+      });
+  }
+
+  private buildWeaponUnlockOptions(context: UpgradeContext): UpgradeOption[] {
+    if (context.runLevel < 2 || context.ownedRandomWeaponIds.length >= 4) return [];
+
+    const owned = new Set<RandomWeaponId>(context.ownedRandomWeaponIds);
     const weight = context.runLevel >= 3 ? 7 : 3;
 
     return RANDOM_WEAPON_IDS
       .filter((weaponId) => !owned.has(weaponId))
       .map((weaponId) => ({
-        id: `unlock-${weaponId}` as UpgradeId,
+        id: `unlock:${weaponId}`,
+        kind: 'unlock-weapon' as const,
         title: RANDOM_WEAPON_DEFINITIONS[weaponId].name,
         description: WEAPON_DESCRIPTIONS[weaponId],
         rarity: 'RARE' as const,
@@ -120,12 +149,15 @@ export class UpgradeDirectorLite {
       }));
   }
 
-  private isEligible(id: UpgradeId, context: UpgradeContext): boolean {
-    if (id === 'auto-cannon-level') return context.autoCannonLevel < 10;
-    if (id === 'global-damage') return context.globalDamageLevel < 10;
-    if (id === 'global-attack-speed') return context.globalAttackSpeedLevel < 10;
-    if (id === 'base-max-hp') return context.baseHpUpgradeLevel < 10;
+  private isBaseEligible(kind: UpgradeKind, context: UpgradeContext): boolean {
+    if (kind === 'global-damage') return context.globalDamageLevel < 10;
+    if (kind === 'global-attack-speed') return context.globalAttackSpeedLevel < 10;
+    if (kind === 'base-max-hp') return context.baseHpUpgradeLevel < 10;
     return true;
+  }
+
+  private isWeaponCategory(option: UpgradeOption): boolean {
+    return option.kind === 'weapon-level' || option.kind === 'unlock-weapon';
   }
 
   private pickWeighted(options: readonly UpgradeOption[]): UpgradeOption {
