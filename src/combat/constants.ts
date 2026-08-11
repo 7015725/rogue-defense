@@ -52,12 +52,12 @@ export const TEST_WAVE_COMPOSITIONS = [
 export const BASE_MAX_HP = 1000;
 
 export const INFANTRY: EnemyDefinition = {
-  hp: 80,
+  hp: 75,
   armor: 0,
   armorGrade: 'UNARMORED',
   domain: 'GROUND',
-  moveSpeed: 56,
-  attackDamage: 13,
+  moveSpeed: 50,
+  attackDamage: 11,
   attackIntervalMs: 1200,
   xp: 5,
   credits: 2,
@@ -66,12 +66,12 @@ export const INFANTRY: EnemyDefinition = {
 };
 
 export const HEAVY: EnemyDefinition = {
-  hp: 220,
-  armor: 100,
+  hp: 210,
+  armor: 90,
   armorGrade: 'HEAVY',
   domain: 'GROUND',
-  moveSpeed: 39,
-  attackDamage: 24,
+  moveSpeed: 35,
+  attackDamage: 20,
   attackIntervalMs: 1500,
   xp: 14,
   credits: 6,
@@ -80,12 +80,12 @@ export const HEAVY: EnemyDefinition = {
 };
 
 export const FLYING: EnemyDefinition = {
-  hp: 60,
+  hp: 55,
   armor: 0,
   armorGrade: 'UNARMORED',
   domain: 'AIR',
-  moveSpeed: 98,
-  attackDamage: 9,
+  moveSpeed: 88,
+  attackDamage: 7,
   attackIntervalMs: 800,
   xp: 7,
   credits: 3,
@@ -94,12 +94,12 @@ export const FLYING: EnemyDefinition = {
 };
 
 export const BOSS: EnemyDefinition = {
-  hp: 2200,
-  armor: 25,
+  hp: 2000,
+  armor: 22,
   armorGrade: 'LIGHT',
   domain: 'GROUND',
-  moveSpeed: 54,
-  attackDamage: 36,
+  moveSpeed: 50,
+  attackDamage: 32,
   attackIntervalMs: 1500,
   xp: 100,
   credits: 100,
