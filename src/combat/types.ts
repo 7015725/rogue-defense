@@ -26,7 +26,7 @@ export interface Targetable {
   applyStun(durationMs: number): void;
 }
 
-export type WeaponMode = 'projectile' | 'shotgun' | 'grenade' | 'tesla';
+export type WeaponMode = 'projectile' | 'shotgun' | 'grenade' | 'tesla' | 'tesla-radial';
 export type TargetingRule = 'frontmost' | 'highest-hp';
 
 export interface WeaponDefinition {
