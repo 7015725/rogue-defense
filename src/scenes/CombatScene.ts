@@ -10,6 +10,7 @@ import {
   TURRET_Y,
   type RandomWeaponId,
 } from '../combat/constants';
+import type { ComboId } from '../combat/types';
 import { Base } from '../entities/Base';
 import { Enemy, type EnemyRewards } from '../entities/Enemy';
 import { Weapon } from '../entities/Weapon';
@@ -33,6 +34,7 @@ export class CombatScene extends Phaser.Scene {
   private upgradeOverlay!: UpgradeOverlay;
   private branchOverlay!: WeaponBranchOverlay;
   private readonly randomWeapons = new Map<RandomWeaponId, Weapon>();
+  private readonly activeCombos = new Set<ComboId>();
   private weapons: Weapon[] = [];
   private enemies: Enemy[] = [];
   private gameSpeed = 1;
@@ -125,7 +127,7 @@ export class CombatScene extends Phaser.Scene {
     } else if (this.waveManager.isComplete) {
       this.clearRemainingEnemies();
       this.finished = true;
-      this.showFinish('M0.6 TEST COMPLETE\nWave 20 air defense cleared\nPress R to restart');
+      this.showFinish('M0.7 TEST COMPLETE\nStatus + Combo pipeline active\nPress R to restart');
     } else if (this.openPendingBranchChoice()) {
       // Weapon milestone choices have priority over queued Run upgrades.
     } else if (this.runState.pendingUpgrades > 0) {
@@ -147,6 +149,7 @@ export class CombatScene extends Phaser.Scene {
       currentWave: this.waveManager.wave,
       ownedWeapons: this.weapons.map((weapon) => ({ id: weapon.id, name: weapon.name, level: weapon.level })),
       ownedRandomWeaponIds: [...this.randomWeapons.keys()],
+      activeComboIds: [...this.activeCombos],
       globalDamageLevel: this.globalDamageLevel,
       globalAttackSpeedLevel: this.globalAttackSpeedLevel,
       baseHpUpgradeLevel: this.baseHpUpgradeLevel,
@@ -210,6 +213,12 @@ export class CombatScene extends Phaser.Scene {
         weapon?.upgradeLevel();
         break;
       }
+      case 'combo':
+        if (option.comboId) {
+          this.activeCombos.add(option.comboId);
+          this.refreshWeaponModifiers();
+        }
+        break;
       case 'global-damage':
         this.globalDamageLevel += 1;
         this.globalDamageMultiplier *= 1.10;
@@ -247,8 +256,10 @@ export class CombatScene extends Phaser.Scene {
   }
 
   private refreshWeaponModifiers(): void {
+    const combos = [...this.activeCombos];
     for (const weapon of this.weapons) {
       weapon.setGlobalModifiers(this.globalDamageMultiplier, this.globalAttackSpeedMultiplier);
+      weapon.setEnabledCombos(combos);
     }
   }
 
@@ -290,7 +301,7 @@ export class CombatScene extends Phaser.Scene {
     this.creditsText = this.add.text(36, 258, '', style).setDepth(10);
     this.baseText = this.add.text(36, BATTLEFIELD_HEIGHT - 265, '', { ...style, fontSize: '21px' }).setDepth(10);
     this.weaponText = this.add.text(36, BATTLEFIELD_HEIGHT - 225, '', { ...style, fontSize: '15px' }).setDepth(10);
-    this.debugText = this.add.text(BATTLEFIELD_WIDTH - 36, 36, '', { ...style, fontSize: '22px', align: 'right' }).setOrigin(1, 0).setDepth(10);
+    this.debugText = this.add.text(BATTLEFIELD_WIDTH - 36, 36, '', { ...style, fontSize: '20px', align: 'right' }).setOrigin(1, 0).setDepth(10);
     this.statusText = this.add.text(BATTLEFIELD_WIDTH / 2, BATTLEFIELD_HEIGHT / 2, '', {
       ...style,
       fontSize: '44px',
@@ -323,6 +334,7 @@ export class CombatScene extends Phaser.Scene {
     this.debugText.setText([
       `Speed ${this.gameSpeed}x${this.isChoicePaused() ? ' · PAUSED' : ''}`,
       `Weapons ${this.weapons.length}/5 · Secondary AA ${hasSecondaryAa ? 'YES' : 'NO'}`,
+      `Combos ${this.activeCombos.size}/4${this.activeCombos.size > 0 ? ` · ${[...this.activeCombos].join(', ')}` : ''}`,
       `Projectiles ${this.projectilePool.activeCount}`,
       `FPS ${Math.round(this.game.loop.actualFps)}`,
       `DMG ${this.globalDamageMultiplier.toFixed(2)}x · AS ${this.globalAttackSpeedMultiplier.toFixed(2)}x`,
