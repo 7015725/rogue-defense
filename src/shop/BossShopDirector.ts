@@ -48,10 +48,10 @@ export interface BossShopItem {
 }
 
 const COMBO_LABELS: Record<ComboId, { title: string; description: string }> = {
-  DETONATION: { title: '爆燃协议', description: 'Burn + Explosion → 结算部分剩余 Burn' },
-  CONCUSSIVE_BREAK: { title: '震荡破甲', description: 'Hard Control + Heavy Hit → ArmorBreak' },
-  OVERLOAD: { title: '电力过载', description: 'Charged + Lightning → 额外电弧伤害' },
-  CONTROL_EXECUTION: { title: '控制处决', description: 'Hard Control + Sniper Critical → 追加伤害' },
+  DETONATION: { title: '爆燃协议', description: '需要燃烧来源 + Auto-GL：爆炸命中燃烧目标后引爆部分剩余燃烧' },
+  CONCUSSIVE_BREAK: { title: '震荡破甲', description: 'Tesla + Sniper：眩晕时被 Sniper 命中\n护甲 -35，持续 4 秒' },
+  OVERLOAD: { title: '电力过载', description: 'Tesla：充能目标再次被电击\n额外 35% 伤害，并溅射最近敌人' },
+  CONTROL_EXECUTION: { title: '控制处决', description: 'Tesla + Sniper：眩晕时 Sniper 暴击\n追加本次最终伤害的 75%' },
 };
 
 export class BossShopDirector {
