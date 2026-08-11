@@ -1,7 +1,9 @@
 # Rogue Defense 设计文档索引
 
-## 当前阶段：V0.1 Integration
+## 当前阶段：V0.1 Web Release Candidate
 
+- [`v0.1-web-rc.md`](v0.1-web-rc.md)：PWA 包装、Browser Smoke Gate、CI Web Artifact 与 GitHub Pages 发布策略。
+- [`v0.1-rc-validation.md`](v0.1-rc-validation.md)：RC 自动 Gate、PWA、Pages、真长局、性能和设备验收清单。
 - [`v0.1-integration.md`](v0.1-integration.md)：Endless Wave、Population Budget、Wave Scaling、W100 难度解锁与 W101+ 延续规则。
 - [`v0.1-playtest-tools.md`](v0.1-playtest-tools.md)：DEV 快捷 Wave、Stress 300、无存档 DEV Settlement、HUD/Status/Projectile 性能优化与移动端触控规则。
 - [`v0.1-validation.md`](v0.1-validation.md)：V0.1 Endless/W100、DEV、移动端、长局回归与性能验证清单。
@@ -38,4 +40,4 @@
 - 已确认的系统级决策进入总稿、Decision Log 或当前专项文档。
 - 后续专项文档可以覆盖早期原型测试值；历史里程碑文档不删除，以保留演进记录。
 - 具体数值在真实浏览器 Playtest 完成前仍视为 V0.1 调参基线。
-- V0.1 Integration 不再优先增加主要系统，重点转为长局、平衡、UI、性能和运行时回归。
+- V0.1 RC 不再新增主要系统，重点是浏览器 Gate、分发、真长局、平衡、UI、性能和设备回归。
