@@ -14,6 +14,7 @@
 - 后续开发直接修改 `main`，不再为每个里程碑创建分支或 PR。
 - `main` push 继续触发 GitHub Actions CI。
 - CI 使用 concurrency；同一分支的新提交会取消已过期的旧构建，只保留最新状态验证。
+- CI 会把最终构建状态回写为 `ci/build` commit status，便于直接验证 `main`。
 
 ## 2026-08-11 — M0.3 武器基础形态
 
@@ -40,4 +41,16 @@
 - Tesla β 地面放电会真实切换到径向 AOE。
 - 龙息 Burn、烟幕 AttackSpeed Debuff 等正式状态效果继续留到 M0.7，不为 M0.4 建立第二套临时状态系统。
 
-完整细节见 `game-design-v0.2.md`、`m0.3-design.md`、`m0.4-design.md`。
+## 2026-08-11 — M0.5 Armor + Heavy
+
+- Armor 正式抽成独立 `ArmorSystem`，常规直接伤害统一使用 `Armor / (Armor + 100)`。
+- 玩家可见 Armor Grade 统一为 UNARMORED / LIGHT / MEDIUM / HEAVY；等级是敌人身份，不随 Wave 无限上涨。
+- Infantry = Armor 0 / UNARMORED；Heavy = Armor 100 / HEAVY；Wave 10 Boss = Armor 20 / LIGHT。
+- Heavy 基础数值：HP 220、MoveSpeed 36、AttackDamage 22、EXP 14、Credits 6。
+- Wave 6～9 逐步混入 1 / 2 / 2 / 3 个 Heavy，并在生成节奏中分散出现。
+- M0.4 已存在的 Armor Penetration 路线从本阶段开始正式形成敌人克制价值。
+- `Targetable` 增加 `applyArmorBreak(amount, durationMs)`；Enemy 支持临时 ArmorBreak，结束后自动恢复。
+- ArmorBreak 暂不加入新卡池，预留给 M0.7 震荡破甲 Combo 和未来武器核心。
+- 有甲敌人显示 Armor Grade 标签，HUD 在 Heavy 存活时显示 Heavy 数量。
+
+完整细节见 `game-design-v0.2.md`、`m0.4-design.md`、`m0.5-design.md`。
