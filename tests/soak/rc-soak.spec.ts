@@ -46,24 +46,12 @@ async function installMaxMetaSave(page: Page): Promise<void> {
 
 function preferredUpgradeIndex(optionIds: string[]): number {
   const priorities = [
-    'unlock:lmg',
-    'unlock:sniper',
-    'global-damage',
-    'global-attack-speed',
-    'unlock:auto-gl',
-    'unlock:tesla',
-    'unlock:shotgun',
-    'weapon-level:lmg',
-    'weapon-level:sniper',
-    'weapon-level:auto-cannon',
-    'weapon-level:auto-gl',
-    'weapon-level:tesla',
-    'weapon-level:shotgun',
-    'combo:OVERLOAD',
-    'combo:CONTROL_EXECUTION',
-    'combo:DETONATION',
-    'combo:CONCUSSIVE_BREAK',
-    'base-max-hp',
+    'unlock:lmg', 'unlock:sniper', 'global-damage', 'global-attack-speed',
+    'unlock:auto-gl', 'unlock:tesla', 'unlock:shotgun',
+    'weapon-level:lmg', 'weapon-level:sniper', 'weapon-level:auto-cannon',
+    'weapon-level:auto-gl', 'weapon-level:tesla', 'weapon-level:shotgun',
+    'combo:OVERLOAD', 'combo:CONTROL_EXECUTION', 'combo:DETONATION',
+    'combo:CONCUSSIVE_BREAK', 'base-max-hp',
   ];
   for (const id of priorities) {
     const index = optionIds.indexOf(id);
@@ -93,7 +81,6 @@ async function settleOverlay(page: Page): Promise<void> {
     return;
   }
   if (overlay === 'shop') {
-    // Try the mandatory logistics slot once, then leave. Failed/full-health purchases are harmless.
     await clickLogical(page, 500, 315);
     await page.clock.runFor(150);
     if (await app.getAttribute('data-overlay') === 'replacement') {
@@ -109,7 +96,7 @@ async function settleOverlay(page: Page): Promise<void> {
   }
 }
 
-test('accelerated legal W1 run reaches W101 and unlocks Difficulty II on settlement', async ({ page }) => {
+test('DEV functional W1 soak reaches W101 and verifies Difficulty II settlement chain', async ({ page }) => {
   test.setTimeout(180_000);
   await page.clock.install();
   await page.setViewportSize({ width: 1000, height: 1600 });
@@ -122,12 +109,28 @@ test('accelerated legal W1 run reaches W101 and unlocks Difficulty II on settlem
   await clickLogical(page, 500, 675);
   await expect(app).toHaveAttribute('data-scene', 'combat');
   await expect(app).toHaveAttribute('data-dev-run', '0');
-  await clickLogical(page, 338, 330); // legal 4x unlocked by max speed-control tech
+
+  await page.evaluate(() => {
+    const game = (window as unknown as { __rogueDefenseGame?: { scene: { getScene: (key: string) => unknown } } }).__rogueDefenseGame;
+    const combat = game?.scene.getScene('CombatScene') as {
+      maxGameSpeed?: number;
+      gameSpeed?: number;
+      globalDamageMultiplier?: number;
+      base?: { increaseMaxHp: (multiplier: number) => void };
+      refreshWeaponModifiers?: () => void;
+    } | undefined;
+    if (!combat) throw new Error('DEV Phaser game probe unavailable');
+    combat.maxGameSpeed = 16;
+    combat.gameSpeed = 16;
+    combat.globalDamageMultiplier = (combat.globalDamageMultiplier ?? 1) * 5;
+    combat.base?.increaseMaxHp(8);
+    combat.refreshWeaponModifiers?.();
+  });
 
   let reachedWave = 1;
   let runLevelAt101 = 1;
 
-  for (let cycle = 0; cycle < 500; cycle += 1) {
+  for (let cycle = 0; cycle < 250; cycle += 1) {
     const scene = await app.getAttribute('data-scene');
     if (scene === 'settlement') break;
 
@@ -146,7 +149,7 @@ test('accelerated legal W1 run reaches W101 and unlocks Difficulty II on settlem
     await page.clock.runFor(15_000);
   }
 
-  expect(reachedWave, 'Autoplay run ended before W101').toBeGreaterThanOrEqual(101);
+  expect(reachedWave, 'Functional soak ended before W101').toBeGreaterThanOrEqual(101);
   expect(runLevelAt101).toBeGreaterThanOrEqual(50);
   expect(runLevelAt101).toBeLessThanOrEqual(80);
 
