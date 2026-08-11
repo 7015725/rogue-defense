@@ -27,6 +27,7 @@ import {
   type BossShopItem,
 } from '../shop/BossShopDirector';
 import { ProjectilePool } from '../systems/ProjectilePool';
+import { WaveDirector } from '../systems/WaveDirector';
 import { WaveManager } from '../systems/WaveManager';
 import { BossShopOverlay } from '../ui/BossShopOverlay';
 import { UpgradeOverlay } from '../ui/UpgradeOverlay';
@@ -213,11 +214,6 @@ export class CombatScene extends Phaser.Scene {
 
     if (!this.base.alive) {
       this.finishRun('BASE_DESTROYED');
-      return;
-    }
-    if (this.waveManager.isComplete) {
-      this.clearRemainingEnemies();
-      this.finishRun('TEST_COMPLETE');
       return;
     }
     if (this.openPendingBranchChoice()) {
@@ -567,8 +563,14 @@ export class CombatScene extends Phaser.Scene {
     const airCount = this.enemies.filter((enemy) => enemy.domain === 'AIR').length;
     const hasSecondaryAa = [...this.randomWeapons.keys()].some((id) => id === 'lmg' || id === 'sniper');
     const difficulty = getDifficulty(this.difficultyId);
+    const scaling = WaveDirector.getScaling(this.waveManager.wave);
+    const waveKind = this.waveManager.isBossWave
+      ? '  BOSS GATE'
+      : this.waveManager.isReinforcedWave
+        ? '  REINFORCED'
+        : '';
 
-    this.waveText.setText(`Difficulty ${difficulty.label} · Wave ${this.waveManager.wave}${this.waveManager.isBossWave ? '  BOSS GATE' : ''}`);
+    this.waveText.setText(`Difficulty ${difficulty.label} · Wave ${this.waveManager.wave}${waveKind}`);
     this.enemyText.setText(`Enemies ${this.enemies.length}${heavyCount > 0 ? ` · Heavy ${heavyCount}` : ''}${airCount > 0 ? ` · Air ${airCount}` : ''}`);
     this.runText.setText(`Run Lv ${this.runState.level}  EXP ${this.runState.xp}/${this.runState.xpToNextLevel}`);
     this.creditsText.setText(`Credits ${this.runState.credits} · Reroll ${this.runState.rerollCharges}`);
@@ -579,6 +581,7 @@ export class CombatScene extends Phaser.Scene {
 
     this.debugText.setText([
       `Speed ${this.gameSpeed}x / ${this.maxGameSpeed}x${this.isChoicePaused() ? ' · PAUSED' : ''}`,
+      `Budget ${this.waveManager.isBossWave ? 'BOSS' : this.waveManager.populationBudget} · HP ${scaling.hpMultiplier.toFixed(2)}x · DMG ${scaling.damageMultiplier.toFixed(2)}x`,
       `Kills ${this.kills} · Boss ${this.bossKills}`,
       `Weapons ${this.weapons.length}/5 · Secondary AA ${hasSecondaryAa ? 'YES' : 'NO'}`,
       `Combos ${this.activeCombos.size}/4`,
@@ -609,7 +612,7 @@ export class CombatScene extends Phaser.Scene {
     this.clearRemainingEnemies();
     const summary: RunSummary = {
       difficulty: this.difficultyId,
-      highestWave: Math.min(30, this.waveManager.wave),
+      highestWave: this.waveManager.wave,
       runLevel: this.runState.level,
       kills: this.kills,
       bossKills: this.bossKills,
