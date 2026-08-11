@@ -17,8 +17,10 @@ const config: Phaser.Types.Core.GameConfig = {
   antialias: false,
   roundPixels: true,
   scale: {
-    mode: Phaser.Scale.FIT,
-    autoCenter: Phaser.Scale.CENTER_BOTH,
+    // EXPAND lets the visible canvas consume the whole browser viewport while
+    // preserving the logical game size and FIT-style internal scaling.
+    mode: Phaser.Scale.EXPAND,
+    autoCenter: Phaser.Scale.NO_CENTER,
   },
   scene: [MainMenuScene, CombatScene, SettlementScene],
 };
