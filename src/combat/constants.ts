@@ -1,4 +1,4 @@
-import type { WeaponDefinition } from './types';
+import type { EnemyDefinition, WeaponDefinition } from './types';
 
 export const BATTLEFIELD_WIDTH = 1000;
 export const BATTLEFIELD_HEIGHT = 1600;
@@ -14,29 +14,58 @@ export const LANE_OFFSETS = [-160, -80, 0, 80, 160] as const;
 export const WAVE_DURATION_MS = 30_000;
 export const WAVE_SPAWN_WINDOW_MS = 24_000;
 
-export const TEST_WAVE_COUNTS = [8, 9, 11, 13, 15, 17, 19, 21, 24] as const;
+export const TEST_WAVE_COMPOSITIONS = [
+  { infantry: 8, heavy: 0 },
+  { infantry: 9, heavy: 0 },
+  { infantry: 11, heavy: 0 },
+  { infantry: 13, heavy: 0 },
+  { infantry: 15, heavy: 0 },
+  { infantry: 14, heavy: 1 },
+  { infantry: 15, heavy: 2 },
+  { infantry: 16, heavy: 2 },
+  { infantry: 17, heavy: 3 },
+] as const;
 
 export const BASE_MAX_HP = 1000;
 
-export const INFANTRY = {
+export const INFANTRY: EnemyDefinition = {
   hp: 80,
   armor: 0,
+  armorGrade: 'UNARMORED',
   moveSpeed: 52,
   attackDamage: 12,
   attackIntervalMs: 1200,
   xp: 5,
   credits: 2,
-} as const;
+  size: 42,
+  color: 0x64748b,
+};
 
-export const BOSS = {
+export const HEAVY: EnemyDefinition = {
+  hp: 220,
+  armor: 100,
+  armorGrade: 'HEAVY',
+  moveSpeed: 36,
+  attackDamage: 22,
+  attackIntervalMs: 1500,
+  xp: 14,
+  credits: 6,
+  size: 58,
+  color: 0x475569,
+};
+
+export const BOSS: EnemyDefinition = {
   hp: 1800,
   armor: 20,
+  armorGrade: 'LIGHT',
   moveSpeed: 50,
   attackDamage: 32,
   attackIntervalMs: 1500,
   xp: 100,
   credits: 100,
-} as const;
+  size: 92,
+  color: 0xb45309,
+};
 
 export const AUTO_CANNON: WeaponDefinition = {
   id: 'auto-cannon',
