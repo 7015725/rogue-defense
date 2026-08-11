@@ -4,7 +4,7 @@
 
 ## 当前阶段
 
-**M0.6 — Air + Anti-Air**
+**M0.7 — Status + Combo**
 
 当前原型已经具备：
 
@@ -19,17 +19,16 @@
 - 所有 6 把武器可独立 Lv1～10；
 - Lv5 α / β / γ 路线 + Lv10 路线专精；
 - Armor Grade / ArmorSystem / Heavy Armored Enemy；
-- TargetDomain：GROUND / AIR；
-- 独立 GroundPath / AirPath；
-- Recon Drone：Wave 20 首次出现；
-- Auto Cannon / LMG / Sniper 可对空；
-- Shotgun / Auto-GL / Tesla 仅攻击地面；
-- Cone / AOE / Chain / Split Target 全部遵守 TargetDomain；
-- Wave 15+ 缺副防空时提高 LMG / Sniper 权重；
-- Wave 18+ 仍缺副防空时保证下一次升级展示 LMG 或 Sniper；
+- GroundPath / AirPath / TargetDomain；
+- Recon Drone 与防空随机保护；
+- 统一 StatusEffectSystem：Burn / Slow / Freeze / Stun / ArmorBreak / Charged / Suppressed；
+- Shotgun α 龙息 Burn；
+- Auto-GL α Slow、γ Smoke AttackSpeed Debuff；
+- Tesla Stun + Charged；
+- Boss 连续 Hard Control Resistance；
+- 首批 4 个 Combo 三选一卡：爆燃协议 / 震荡破甲 / 电力过载 / 控制处决；
+- Projectile / Cone / AOE / Chain / Radial 共用 Damage → Combo → Status 管线；
 - 1× / 2× / 3× / 4× 模拟速度。
-
-复杂 Burn、Smoke Debuff、正式 Stun Resistance 与 Combo 状态逻辑仍保留到 M0.7。
 
 ## 技术栈
 
@@ -67,8 +66,9 @@ npm run build
 ## 文档
 
 - [设计文档索引](docs/README.md)
+- [M0.7 设计](docs/m0.7-design.md)
+- [M0.7 验证清单](docs/m0.7-validation.md)
 - [M0.6 设计](docs/m0.6-design.md)
-- [M0.6 验证清单](docs/m0.6-validation.md)
 - [M0.5 设计](docs/m0.5-design.md)
 - [M0.4 设计](docs/m0.4-design.md)
 - [V0.2 游戏系统设计总稿](docs/game-design-v0.2.md)
@@ -84,8 +84,8 @@ M0.2  Run EXP + 三选一 + LMG       ✓
 M0.3  5 种随机武器                 ✓
 M0.4  Lv1～10 + Lv5/Lv10 路线      ✓
 M0.5  Armor + 重甲                 ✓
-M0.6  Air + 防空                   ← 当前
-M0.7  Status + Combo
+M0.6  Air + 防空                   ✓
+M0.7  Status + Combo               ← 当前
 M0.8  Boss Shop
 M0.9  结算 + 科技树 + Save
 V0.1  完整 Web 可玩版
