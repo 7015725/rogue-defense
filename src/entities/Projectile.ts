@@ -37,10 +37,9 @@ export class Projectile {
   update(deltaMs: number): void {
     if (!this.active || !this.damageContext) return;
 
+    const step = this.speed * (deltaMs / 1000);
     if (this.target?.alive) {
-      this.refreshDirection(this.target.x, this.target.y);
-      const distance = Phaser.Math.Distance.Between(this.shape.x, this.shape.y, this.target.x, this.target.y);
-      const step = this.speed * (deltaMs / 1000);
+      const distance = this.refreshDirection(this.target.x, this.target.y);
       if (distance <= Math.max(step, 18)) {
         DamageSystem.apply(this.target, this.damageContext);
         this.release();
@@ -55,7 +54,6 @@ export class Projectile {
       }
     }
 
-    const step = this.speed * (deltaMs / 1000);
     this.shape.x += this.vx * step;
     this.shape.y += this.vy * step;
   }
@@ -67,9 +65,14 @@ export class Projectile {
     this.shape.setVisible(false).setPosition(-100, -100);
   }
 
-  private refreshDirection(targetX: number, targetY: number): void {
-    const angle = Phaser.Math.Angle.Between(this.shape.x, this.shape.y, targetX, targetY);
-    this.vx = Math.cos(angle);
-    this.vy = Math.sin(angle);
+  private refreshDirection(targetX: number, targetY: number): number {
+    const dx = targetX - this.shape.x;
+    const dy = targetY - this.shape.y;
+    const distance = Math.hypot(dx, dy);
+    if (distance > 0.0001) {
+      this.vx = dx / distance;
+      this.vy = dy / distance;
+    }
+    return distance;
   }
 }
