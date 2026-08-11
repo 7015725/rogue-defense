@@ -3,13 +3,15 @@ import {
   RANDOM_WEAPON_IDS,
   type RandomWeaponId,
 } from '../combat/constants';
+import type { ComboId } from '../combat/types';
 
 export type UpgradeKind =
   | 'global-damage'
   | 'global-attack-speed'
   | 'base-max-hp'
   | 'weapon-level'
-  | 'unlock-weapon';
+  | 'unlock-weapon'
+  | 'combo';
 
 export interface UpgradeOption {
   id: string;
@@ -19,6 +21,7 @@ export interface UpgradeOption {
   rarity: 'COMMON' | 'RARE';
   weight: number;
   weaponId?: string;
+  comboId?: ComboId;
 }
 
 export interface OwnedWeaponSnapshot {
@@ -32,6 +35,7 @@ export interface UpgradeContext {
   currentWave: number;
   ownedWeapons: readonly OwnedWeaponSnapshot[];
   ownedRandomWeaponIds: readonly RandomWeaponId[];
+  activeComboIds: readonly ComboId[];
   globalDamageLevel: number;
   globalAttackSpeedLevel: number;
   baseHpUpgradeLevel: number;
@@ -69,7 +73,7 @@ const WEAPON_DESCRIPTIONS: Record<RandomWeaponId, string> = {
   shotgun: '近距离锥形 AOE · 仅地面\n越靠近命中弹丸越多',
   sniper: '全场高伤单体 · 可对空\n优先最高 HP 目标',
   'auto-gl': '延迟落点爆炸 · 仅地面\n中距离范围伤害',
-  tesla: '短距连锁电击 · 仅地面\n3 目标 + 轻量 Stun',
+  tesla: '短距连锁电击 · 仅地面\n3 目标 + Stun / Charged',
 };
 
 const SECONDARY_AA_IDS = new Set<RandomWeaponId>(['lmg', 'sniper']);
@@ -82,7 +86,8 @@ export class UpgradeDirectorLite {
     const baseEligible = BASE_OPTIONS.filter((option) => this.isBaseEligible(option.kind, context));
     const levelOptions = this.buildWeaponLevelOptions(context);
     const unlockOptions = this.buildWeaponUnlockOptions(context);
-    const eligible = [...baseEligible, ...levelOptions, ...unlockOptions];
+    const comboOptions = this.buildComboOptions(context);
+    const eligible = [...baseEligible, ...levelOptions, ...unlockOptions, ...comboOptions];
     const selected: UpgradeOption[] = [];
 
     const hasSecondaryAa = context.ownedRandomWeaponIds.some((id) => SECONDARY_AA_IDS.has(id));
@@ -111,9 +116,10 @@ export class UpgradeDirectorLite {
 
     while (selected.length < 3 && remaining.length > 0) {
       const alreadyHasWeaponCategory = selected.some((option) => this.isWeaponCategory(option));
+      const alreadyHasCombo = selected.some((option) => option.kind === 'combo');
       const weighted = remaining.map((option) => ({
         ...option,
-        weight: this.isWeaponCategory(option) && alreadyHasWeaponCategory ? option.weight * 0.35 : option.weight,
+        weight: this.getDiversityWeight(option, alreadyHasWeaponCategory, alreadyHasCombo),
       }));
       const picked = this.pickWeighted(weighted);
       selected.push(picked);
@@ -176,6 +182,65 @@ export class UpgradeDirectorLite {
       });
   }
 
+  private buildComboOptions(context: UpgradeContext): UpgradeOption[] {
+    if (context.runLevel < 8) return [];
+
+    const ownedWeapons = new Set(context.ownedWeapons.map((weapon) => weapon.id));
+    const active = new Set<ComboId>(context.activeComboIds);
+    const options: UpgradeOption[] = [];
+
+    if (!active.has('DETONATION') && ownedWeapons.has('shotgun') && ownedWeapons.has('auto-gl')) {
+      options.push({
+        id: 'combo:DETONATION',
+        kind: 'combo',
+        comboId: 'DETONATION',
+        title: '爆燃协议',
+        description: 'Burn + Explosion\n结算部分剩余燃烧并消耗 1 层 Burn',
+        rarity: 'RARE',
+        weight: 4,
+      });
+    }
+
+    if (!active.has('CONCUSSIVE_BREAK') && ownedWeapons.has('tesla')
+      && (ownedWeapons.has('sniper') || ownedWeapons.has('shotgun'))) {
+      options.push({
+        id: 'combo:CONCUSSIVE_BREAK',
+        kind: 'combo',
+        comboId: 'CONCUSSIVE_BREAK',
+        title: '震荡破甲',
+        description: 'Hard Control + Heavy Hit\n目标获得 Armor Break 35 / 4s',
+        rarity: 'RARE',
+        weight: 4,
+      });
+    }
+
+    if (!active.has('OVERLOAD') && ownedWeapons.has('tesla')) {
+      options.push({
+        id: 'combo:OVERLOAD',
+        kind: 'combo',
+        comboId: 'OVERLOAD',
+        title: '电力过载',
+        description: 'Charged + Lightning\n追加伤害并向附近目标溢出电弧',
+        rarity: 'RARE',
+        weight: 4,
+      });
+    }
+
+    if (!active.has('CONTROL_EXECUTION') && ownedWeapons.has('tesla') && ownedWeapons.has('sniper')) {
+      options.push({
+        id: 'combo:CONTROL_EXECUTION',
+        kind: 'combo',
+        comboId: 'CONTROL_EXECUTION',
+        title: '控制处决',
+        description: 'Hard Control + Sniper Critical\n追加 75% 本次有效伤害',
+        rarity: 'RARE',
+        weight: 4,
+      });
+    }
+
+    return options;
+  }
+
   private isBaseEligible(kind: UpgradeKind, context: UpgradeContext): boolean {
     if (kind === 'global-damage') return context.globalDamageLevel < 10;
     if (kind === 'global-attack-speed') return context.globalAttackSpeedLevel < 10;
@@ -185,6 +250,16 @@ export class UpgradeDirectorLite {
 
   private isWeaponCategory(option: UpgradeOption): boolean {
     return option.kind === 'weapon-level' || option.kind === 'unlock-weapon';
+  }
+
+  private getDiversityWeight(
+    option: UpgradeOption,
+    alreadyHasWeaponCategory: boolean,
+    alreadyHasCombo: boolean,
+  ): number {
+    if (this.isWeaponCategory(option) && alreadyHasWeaponCategory) return option.weight * 0.35;
+    if (option.kind === 'combo' && alreadyHasCombo) return option.weight * 0.35;
+    return option.weight;
   }
 
   private pickWeighted(options: readonly UpgradeOption[]): UpgradeOption {
