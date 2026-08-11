@@ -66,9 +66,9 @@ export class Enemy implements Targetable {
   private readonly spawnX: number;
   private readonly airPhase: number;
   private readonly shape: Phaser.GameObjects.Rectangle;
-  private readonly healthBar: Phaser.GameObjects.Rectangle;
-  private readonly armorBadge: Phaser.GameObjects.Text | null;
-  private readonly domainBadge: Phaser.GameObjects.Text | null;
+  private healthBar: Phaser.GameObjects.Rectangle | null = null;
+  private armorBadge: Phaser.GameObjects.Text | null = null;
+  private domainBadge: Phaser.GameObjects.Text | null = null;
   private statusBadge: Phaser.GameObjects.Text | null = null;
   private lastStatusLabel = '';
   private statusBadgeRefreshMs = 0;
@@ -113,37 +113,10 @@ export class Enemy implements Targetable {
       .setStrokeStyle(kind === 'heavy' ? 6 : 4, this.domain === 'AIR' ? 0xbae6fd : 0xe2e8f0);
     if (this.domain === 'AIR') this.shape.setRotation(Math.PI / 4);
 
-    this.healthBar = scene.add.rectangle(
-      this.spawnX,
-      ENEMY_SPAWN_Y - stats.size * 0.72,
-      stats.size,
-      8,
-      0x22c55e,
-    ).setOrigin(0.5, 0.5);
-
-    const armorLabel = ARMOR_LABELS[this.armorGrade];
-    this.armorBadge = armorLabel
-      ? scene.add.text(this.spawnX, ENEMY_SPAWN_Y + stats.size * 0.72, armorLabel, {
-        fontFamily: 'monospace',
-        fontSize: kind === 'boss' ? '16px' : '12px',
-        color: this.armorGrade === 'HEAVY' ? '#f8fafc' : '#fde68a',
-        backgroundColor: '#020617bb',
-        padding: { x: 4, y: 2 },
-      }).setOrigin(0.5)
-      : null;
-
-    this.domainBadge = this.domain === 'AIR'
-      ? scene.add.text(this.spawnX, ENEMY_SPAWN_Y + stats.size * 0.85, 'AIR', {
-        fontFamily: 'monospace',
-        fontSize: '13px',
-        color: '#7dd3fc',
-        backgroundColor: '#082f49cc',
-        padding: { x: 5, y: 2 },
-      }).setOrigin(0.5)
-      : null;
+    this.crowdMode = Enemy.crowdModeEnabled && kind !== 'boss';
+    if (!this.crowdMode) this.createDetailVisuals();
 
     Enemy.activeInstances.add(this);
-    if (Enemy.crowdModeEnabled) this.setCrowdMode(true);
     Enemy.refreshCrowdMode();
   }
 
@@ -163,13 +136,10 @@ export class Enemy implements Targetable {
     const next = enabled && this.kind !== 'boss';
     if (this.crowdMode === next) return;
     this.crowdMode = next;
-    this.healthBar.setVisible(!next);
-    this.armorBadge?.setVisible(!next);
-    this.domainBadge?.setVisible(!next);
     if (next) {
-      this.statusBadge?.setVisible(false);
+      this.destroyDetailVisuals();
     } else {
-      this.syncDecorations();
+      this.createDetailVisuals();
       this.updateHealthBar();
       this.updateStatusBadge(true);
     }
@@ -286,7 +256,54 @@ export class Enemy implements Targetable {
     return centerPull + sway;
   }
 
+  private createDetailVisuals(): void {
+    if (this.dead || this.crowdMode || this.healthBar) return;
+    const stats = this.getDefinition(this.kind);
+
+    this.healthBar = this.scene.add.rectangle(
+      this.x,
+      this.y - stats.size * 0.72,
+      stats.size,
+      8,
+      0x22c55e,
+    ).setOrigin(0.5, 0.5);
+
+    const armorLabel = ARMOR_LABELS[this.armorGrade];
+    this.armorBadge = armorLabel
+      ? this.scene.add.text(this.x, this.y + stats.size * 0.72, armorLabel, {
+        fontFamily: 'monospace',
+        fontSize: this.kind === 'boss' ? '16px' : '12px',
+        color: this.armorGrade === 'HEAVY' ? '#f8fafc' : '#fde68a',
+        backgroundColor: '#020617bb',
+        padding: { x: 4, y: 2 },
+      }).setOrigin(0.5)
+      : null;
+
+    this.domainBadge = this.domain === 'AIR'
+      ? this.scene.add.text(this.x, this.y + stats.size * 0.85, 'AIR', {
+        fontFamily: 'monospace',
+        fontSize: '13px',
+        color: '#7dd3fc',
+        backgroundColor: '#082f49cc',
+        padding: { x: 5, y: 2 },
+      }).setOrigin(0.5)
+      : null;
+  }
+
+  private destroyDetailVisuals(): void {
+    this.healthBar?.destroy();
+    this.healthBar = null;
+    this.armorBadge?.destroy();
+    this.armorBadge = null;
+    this.domainBadge?.destroy();
+    this.domainBadge = null;
+    this.statusBadge?.destroy();
+    this.statusBadge = null;
+    this.lastStatusLabel = '';
+  }
+
   private updateHealthBar(): void {
+    if (!this.healthBar) return;
     const ratio = Phaser.Math.Clamp(this.hp / this.maxHpValue, 0, 1);
     this.healthBar.scaleX = ratio;
   }
@@ -316,7 +333,7 @@ export class Enemy implements Targetable {
   }
 
   private syncDecorations(): void {
-    this.healthBar.setPosition(this.shape.x, this.shape.y - this.shape.height * 0.72);
+    this.healthBar?.setPosition(this.shape.x, this.shape.y - this.shape.height * 0.72);
     this.armorBadge?.setPosition(this.shape.x, this.shape.y + this.shape.height * 0.72);
     this.domainBadge?.setPosition(this.shape.x, this.shape.y + this.shape.height * 0.85);
     this.statusBadge?.setPosition(this.shape.x, this.shape.y - this.shape.height * 1.05);
@@ -325,10 +342,6 @@ export class Enemy implements Targetable {
   private destroyVisuals(): void {
     Enemy.unregister(this);
     this.shape.destroy();
-    this.healthBar.destroy();
-    this.armorBadge?.destroy();
-    this.domainBadge?.destroy();
-    this.statusBadge?.destroy();
-    this.statusBadge = null;
+    this.destroyDetailVisuals();
   }
 }
