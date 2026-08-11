@@ -43,6 +43,8 @@ const ARMOR_LABELS: Record<ArmorGrade, string> = {
   HEAVY: 'HEAVY ARMOR',
 };
 
+const STATUS_BADGE_REFRESH_MS = 150;
+
 export class Enemy implements Targetable {
   readonly id = nextEnemyId++;
   readonly armorGrade: ArmorGrade;
@@ -62,12 +64,14 @@ export class Enemy implements Targetable {
   private readonly healthBar: Phaser.GameObjects.Rectangle;
   private readonly armorBadge: Phaser.GameObjects.Text | null;
   private readonly domainBadge: Phaser.GameObjects.Text | null;
-  private readonly statusBadge: Phaser.GameObjects.Text;
+  private statusBadge: Phaser.GameObjects.Text | null = null;
+  private lastStatusLabel = '';
+  private statusBadgeRefreshMs = 0;
   private readonly statusEffects: StatusEffectSystem;
   private dead = false;
 
   constructor(
-    scene: Phaser.Scene,
+    private readonly scene: Phaser.Scene,
     private readonly base: Base,
     readonly kind: EnemyKind,
     laneIndex: number,
@@ -131,14 +135,6 @@ export class Enemy implements Targetable {
         padding: { x: 5, y: 2 },
       }).setOrigin(0.5)
       : null;
-
-    this.statusBadge = scene.add.text(this.spawnX, ENEMY_SPAWN_Y - stats.size * 1.05, '', {
-      fontFamily: 'monospace',
-      fontSize: '11px',
-      color: '#fef3c7',
-      backgroundColor: '#020617bb',
-      padding: { x: 3, y: 1 },
-    }).setOrigin(0.5).setVisible(false);
   }
 
   get x(): number { return this.shape.x; }
@@ -158,7 +154,12 @@ export class Enemy implements Targetable {
 
     this.statusEffects.update(deltaMs);
     if (this.dead) return;
-    this.updateStatusBadge();
+
+    this.statusBadgeRefreshMs += deltaMs;
+    if (this.statusBadgeRefreshMs >= STATUS_BADGE_REFRESH_MS) {
+      this.statusBadgeRefreshMs %= STATUS_BADGE_REFRESH_MS;
+      this.updateStatusBadge();
+    }
 
     if (this.statusEffects.movementBlocked) return;
 
@@ -200,7 +201,7 @@ export class Enemy implements Targetable {
   applyStatus(application: StatusApplication): void {
     if (this.dead) return;
     this.statusEffects.apply(application);
-    this.updateStatusBadge();
+    this.updateStatusBadge(true);
   }
 
   hasStatus(type: StatusType): boolean {
@@ -213,7 +214,7 @@ export class Enemy implements Targetable {
 
   consumeStatusStacks(type: StatusType, count: number): number {
     const consumed = this.statusEffects.consumeStacks(type, count);
-    this.updateStatusBadge();
+    this.updateStatusBadge(true);
     return consumed;
   }
 
@@ -244,17 +245,35 @@ export class Enemy implements Targetable {
     this.healthBar.scaleX = ratio;
   }
 
-  private updateStatusBadge(): void {
-    if (this.dead || !this.statusBadge.scene) return;
+  private updateStatusBadge(force = false): void {
+    if (this.dead) return;
     const label = this.statusEffects.label;
-    this.statusBadge.setText(label).setVisible(label.length > 0);
+    if (!force && label === this.lastStatusLabel) return;
+    this.lastStatusLabel = label;
+
+    if (label.length === 0) {
+      this.statusBadge?.setVisible(false);
+      return;
+    }
+
+    if (!this.statusBadge) {
+      this.statusBadge = this.scene.add.text(this.x, this.y - this.shape.height * 1.05, '', {
+        fontFamily: 'monospace',
+        fontSize: '11px',
+        color: '#fef3c7',
+        backgroundColor: '#020617bb',
+        padding: { x: 3, y: 1 },
+      }).setOrigin(0.5);
+    }
+
+    this.statusBadge.setText(label).setVisible(true);
   }
 
   private syncDecorations(): void {
     this.healthBar.setPosition(this.shape.x, this.shape.y - this.shape.height * 0.72);
     this.armorBadge?.setPosition(this.shape.x, this.shape.y + this.shape.height * 0.72);
     this.domainBadge?.setPosition(this.shape.x, this.shape.y + this.shape.height * 0.85);
-    this.statusBadge.setPosition(this.shape.x, this.shape.y - this.shape.height * 1.05);
+    this.statusBadge?.setPosition(this.shape.x, this.shape.y - this.shape.height * 1.05);
   }
 
   private destroyVisuals(): void {
@@ -262,6 +281,7 @@ export class Enemy implements Targetable {
     this.healthBar.destroy();
     this.armorBadge?.destroy();
     this.domainBadge?.destroy();
-    this.statusBadge.destroy();
+    this.statusBadge?.destroy();
+    this.statusBadge = null;
   }
 }
