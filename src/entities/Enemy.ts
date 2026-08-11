@@ -69,6 +69,7 @@ export class Enemy implements Targetable {
   private statusBadgeRefreshMs = 0;
   private readonly statusEffects: StatusEffectSystem;
   private dead = false;
+  private crowdMode = false;
 
   constructor(
     private readonly scene: Phaser.Scene,
@@ -149,16 +150,34 @@ export class Enemy implements Targetable {
     return Phaser.Math.Clamp((this.y - ENEMY_SPAWN_Y) / (BASE_ATTACK_Y - ENEMY_SPAWN_Y), 0, 1);
   }
 
+  setCrowdMode(enabled: boolean): void {
+    const next = enabled && this.kind !== 'boss';
+    if (this.crowdMode === next) return;
+    this.crowdMode = next;
+    this.healthBar.setVisible(!next);
+    this.armorBadge?.setVisible(!next);
+    this.domainBadge?.setVisible(!next);
+    if (next) {
+      this.statusBadge?.setVisible(false);
+    } else {
+      this.syncDecorations();
+      this.updateHealthBar();
+      this.updateStatusBadge(true);
+    }
+  }
+
   update(deltaMs: number): void {
     if (this.dead) return;
 
     this.statusEffects.update(deltaMs);
     if (this.dead) return;
 
-    this.statusBadgeRefreshMs += deltaMs;
-    if (this.statusBadgeRefreshMs >= STATUS_BADGE_REFRESH_MS) {
-      this.statusBadgeRefreshMs %= STATUS_BADGE_REFRESH_MS;
-      this.updateStatusBadge();
+    if (!this.crowdMode) {
+      this.statusBadgeRefreshMs += deltaMs;
+      if (this.statusBadgeRefreshMs >= STATUS_BADGE_REFRESH_MS) {
+        this.statusBadgeRefreshMs %= STATUS_BADGE_REFRESH_MS;
+        this.updateStatusBadge();
+      }
     }
 
     if (this.statusEffects.movementBlocked) return;
@@ -174,7 +193,7 @@ export class Enemy implements Targetable {
       this.shape.x = this.domain === 'AIR'
         ? this.getAirPathX(nextProgress)
         : Phaser.Math.Linear(this.spawnX, BASE_X, Math.pow(nextProgress, 1.35));
-      this.syncDecorations();
+      if (!this.crowdMode) this.syncDecorations();
       return;
     }
 
@@ -189,7 +208,7 @@ export class Enemy implements Targetable {
   takeDamage(amount: number): void {
     if (this.dead) return;
     this.hp = Math.max(0, this.hp - amount);
-    this.updateHealthBar();
+    if (!this.crowdMode) this.updateHealthBar();
 
     if (this.hp <= 0) {
       this.dead = true;
@@ -201,7 +220,7 @@ export class Enemy implements Targetable {
   applyStatus(application: StatusApplication): void {
     if (this.dead) return;
     this.statusEffects.apply(application);
-    this.updateStatusBadge(true);
+    if (!this.crowdMode) this.updateStatusBadge(true);
   }
 
   hasStatus(type: StatusType): boolean {
@@ -214,7 +233,7 @@ export class Enemy implements Targetable {
 
   consumeStatusStacks(type: StatusType, count: number): number {
     const consumed = this.statusEffects.consumeStacks(type, count);
-    this.updateStatusBadge(true);
+    if (!this.crowdMode) this.updateStatusBadge(true);
     return consumed;
   }
 
@@ -246,7 +265,7 @@ export class Enemy implements Targetable {
   }
 
   private updateStatusBadge(force = false): void {
-    if (this.dead) return;
+    if (this.dead || this.crowdMode) return;
     const label = this.statusEffects.label;
     if (!force && label === this.lastStatusLabel) return;
     this.lastStatusLabel = label;
