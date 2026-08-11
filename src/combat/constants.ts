@@ -5,7 +5,6 @@ export const ENEMY_SPAWN_Y = 80;
 export const BASE_ATTACK_Y = 1370;
 export const BASE_X = BATTLEFIELD_WIDTH / 2;
 export const BASE_Y = 1490;
-export const TURRET_X = BATTLEFIELD_WIDTH / 2;
 export const TURRET_Y = 1435;
 
 export const LANE_OFFSETS = [-160, -80, 0, 80, 160] as const;
@@ -23,6 +22,8 @@ export const INFANTRY = {
   moveSpeed: 52,
   attackDamage: 12,
   attackIntervalMs: 1200,
+  xp: 5,
+  credits: 2,
 } as const;
 
 export const BOSS = {
@@ -31,9 +32,13 @@ export const BOSS = {
   moveSpeed: 50,
   attackDamage: 32,
   attackIntervalMs: 1500,
+  xp: 100,
+  credits: 100,
 } as const;
 
 export const AUTO_CANNON = {
+  id: 'auto-cannon',
+  name: 'Auto Cannon',
   damage: 18,
   attackIntervalMs: 500,
   range: 720,
@@ -42,4 +47,19 @@ export const AUTO_CANNON = {
   reloadTimeMs: 1600,
   critChance: 0.05,
   critMultiplier: 2,
+  color: 0xe2e8f0,
+} as const;
+
+export const LMG = {
+  id: 'lmg',
+  name: 'LMG Nest',
+  damage: 8,
+  attackIntervalMs: 100,
+  range: 620,
+  projectileSpeed: 1000,
+  magazineSize: 60,
+  reloadTimeMs: 2400,
+  critChance: 0.05,
+  critMultiplier: 2,
+  color: 0xfacc15,
 } as const;

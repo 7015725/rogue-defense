@@ -1,27 +1,49 @@
 import * as Phaser from 'phaser';
 import {
+  AUTO_CANNON,
   BASE_ATTACK_Y,
   BATTLEFIELD_HEIGHT,
   BATTLEFIELD_WIDTH,
   ENEMY_SPAWN_Y,
+  LMG,
+  TURRET_Y,
 } from '../combat/constants';
 import { Base } from '../entities/Base';
-import { Enemy } from '../entities/Enemy';
+import { Enemy, type EnemyRewards } from '../entities/Enemy';
 import { Weapon } from '../entities/Weapon';
+import { RunState } from '../run/RunState';
 import { ProjectilePool } from '../systems/ProjectilePool';
 import { WaveManager } from '../systems/WaveManager';
+import { UpgradeOverlay } from '../ui/UpgradeOverlay';
+import {
+  UpgradeDirectorLite,
+  type UpgradeOption,
+} from '../upgrades/UpgradeDirectorLite';
 
 export class CombatScene extends Phaser.Scene {
   private base!: Base;
-  private weapon!: Weapon;
   private projectilePool!: ProjectilePool;
   private waveManager!: WaveManager;
+  private runState!: RunState;
+  private upgradeDirector!: UpgradeDirectorLite;
+  private upgradeOverlay!: UpgradeOverlay;
+  private autoCannon!: Weapon;
+  private lmg: Weapon | null = null;
+  private weapons: Weapon[] = [];
   private enemies: Enemy[] = [];
   private gameSpeed = 1;
   private finished = false;
 
+  private globalDamageMultiplier = 1;
+  private globalAttackSpeedMultiplier = 1;
+  private globalDamageLevel = 0;
+  private globalAttackSpeedLevel = 0;
+  private baseHpUpgradeLevel = 0;
+
   private waveText!: Phaser.GameObjects.Text;
   private enemyText!: Phaser.GameObjects.Text;
+  private runText!: Phaser.GameObjects.Text;
+  private creditsText!: Phaser.GameObjects.Text;
   private baseText!: Phaser.GameObjects.Text;
   private weaponText!: Phaser.GameObjects.Text;
   private debugText!: Phaser.GameObjects.Text;
@@ -37,25 +59,49 @@ export class CombatScene extends Phaser.Scene {
 
     this.base = new Base(this);
     this.projectilePool = new ProjectilePool(this, 256);
-    this.weapon = new Weapon(this, this.projectilePool);
     this.waveManager = new WaveManager();
+    this.runState = new RunState();
+    this.upgradeDirector = new UpgradeDirectorLite();
+    this.upgradeOverlay = new UpgradeOverlay(this, (option) => this.handleUpgradeSelection(option));
+
+    this.autoCannon = new Weapon(
+      this,
+      this.projectilePool,
+      AUTO_CANNON,
+      BATTLEFIELD_WIDTH / 2,
+      TURRET_Y,
+    );
+    this.weapons = [this.autoCannon];
+    this.refreshWeaponModifiers();
 
     this.createUi();
     this.bindControls();
+    this.updateUi();
   }
 
   update(_time: number, delta: number): void {
     if (this.finished) return;
 
+    if (this.upgradeOverlay.visible) {
+      this.updateUi();
+      return;
+    }
+
     const simDelta = Math.min(delta, 50) * this.gameSpeed;
     const bossAlive = this.enemies.some((enemy) => enemy.alive && enemy.kind === 'boss');
 
     for (const request of this.waveManager.update(simDelta, bossAlive)) {
-      this.enemies.push(new Enemy(this, this.base, request.kind, request.laneIndex));
+      this.enemies.push(new Enemy(
+        this,
+        this.base,
+        request.kind,
+        request.laneIndex,
+        (enemy, rewards) => this.handleEnemyKilled(enemy, rewards),
+      ));
     }
 
     for (const enemy of this.enemies) enemy.update(simDelta);
-    this.weapon.update(simDelta, this.enemies);
+    for (const weapon of this.weapons) weapon.update(simDelta, this.enemies);
     this.projectilePool.update(simDelta);
 
     this.enemies = this.enemies.filter((enemy) => enemy.alive);
@@ -66,10 +112,90 @@ export class CombatScene extends Phaser.Scene {
     } else if (this.waveManager.isComplete) {
       this.clearRemainingEnemies();
       this.finished = true;
-      this.showFinish('M0.1 TEST COMPLETE\nWave 10 Boss defeated\nPress R to restart');
+      this.showFinish('M0.2 TEST COMPLETE\nWave 10 Boss defeated\nPress R to restart');
+    } else if (this.runState.pendingUpgrades > 0) {
+      this.openUpgradeChoice();
     }
 
     this.updateUi();
+  }
+
+  private handleEnemyKilled(_enemy: Enemy, rewards: EnemyRewards): void {
+    this.runState.addRewards(rewards.xp, rewards.credits);
+  }
+
+  private openUpgradeChoice(): void {
+    const options = this.upgradeDirector.generate({
+      runLevel: this.runState.level,
+      hasLmg: this.lmg !== null,
+      autoCannonLevel: this.autoCannon.level,
+      globalDamageLevel: this.globalDamageLevel,
+      globalAttackSpeedLevel: this.globalAttackSpeedLevel,
+      baseHpUpgradeLevel: this.baseHpUpgradeLevel,
+    });
+
+    this.upgradeOverlay.show(options, this.runState.getSkipReward());
+  }
+
+  private handleUpgradeSelection(option: UpgradeOption | null): void {
+    if (option === null) {
+      this.runState.addCredits(this.runState.getSkipReward());
+    } else {
+      this.applyUpgrade(option);
+    }
+
+    this.runState.consumePendingUpgrade();
+
+    if (this.runState.pendingUpgrades > 0 && !this.finished) {
+      this.openUpgradeChoice();
+    }
+
+    this.updateUi();
+  }
+
+  private applyUpgrade(option: UpgradeOption): void {
+    switch (option.id) {
+      case 'global-damage':
+        this.globalDamageLevel += 1;
+        this.globalDamageMultiplier *= 1.10;
+        this.refreshWeaponModifiers();
+        break;
+      case 'global-attack-speed':
+        this.globalAttackSpeedLevel += 1;
+        this.globalAttackSpeedMultiplier *= 1.08;
+        this.refreshWeaponModifiers();
+        break;
+      case 'base-max-hp':
+        this.baseHpUpgradeLevel += 1;
+        this.base.increaseMaxHp(1.12);
+        break;
+      case 'auto-cannon-level':
+        this.autoCannon.upgradeLevel();
+        break;
+      case 'unlock-lmg':
+        this.unlockLmg();
+        break;
+    }
+  }
+
+  private unlockLmg(): void {
+    if (this.lmg) return;
+
+    this.lmg = new Weapon(
+      this,
+      this.projectilePool,
+      LMG,
+      BATTLEFIELD_WIDTH / 2 - 190,
+      TURRET_Y + 12,
+    );
+    this.weapons.push(this.lmg);
+    this.refreshWeaponModifiers();
+  }
+
+  private refreshWeaponModifiers(): void {
+    for (const weapon of this.weapons) {
+      weapon.setGlobalModifiers(this.globalDamageMultiplier, this.globalAttackSpeedMultiplier);
+    }
   }
 
   private drawBattlefield(): void {
@@ -92,8 +218,10 @@ export class CombatScene extends Phaser.Scene {
     const style = { fontFamily: 'monospace', fontSize: '28px', color: '#f8fafc' };
     this.waveText = this.add.text(36, 138, '', style).setDepth(10);
     this.enemyText = this.add.text(36, 178, '', style).setDepth(10);
-    this.baseText = this.add.text(36, BATTLEFIELD_HEIGHT - 102, '', style).setDepth(10);
-    this.weaponText = this.add.text(36, BATTLEFIELD_HEIGHT - 62, '', style).setDepth(10);
+    this.runText = this.add.text(36, 218, '', style).setDepth(10);
+    this.creditsText = this.add.text(36, 258, '', style).setDepth(10);
+    this.baseText = this.add.text(36, BATTLEFIELD_HEIGHT - 116, '', { ...style, fontSize: '22px' }).setDepth(10);
+    this.weaponText = this.add.text(36, BATTLEFIELD_HEIGHT - 84, '', { ...style, fontSize: '19px' }).setDepth(10);
     this.debugText = this.add.text(BATTLEFIELD_WIDTH - 36, 36, '', { ...style, fontSize: '22px', align: 'right' }).setOrigin(1, 0).setDepth(10);
     this.statusText = this.add.text(BATTLEFIELD_WIDTH / 2, BATTLEFIELD_HEIGHT / 2, '', {
       ...style,
@@ -107,12 +235,20 @@ export class CombatScene extends Phaser.Scene {
   private updateUi(): void {
     this.waveText.setText(`Wave ${this.waveManager.wave}${this.waveManager.isBossWave ? '  BOSS' : ''}`);
     this.enemyText.setText(`Enemies ${this.enemies.length}`);
+    this.runText.setText(`Run Lv ${this.runState.level}  EXP ${this.runState.xp}/${this.runState.xpToNextLevel}`);
+    this.creditsText.setText(`Credits ${this.runState.credits}`);
     this.baseText.setText(`Base HP ${Math.ceil(this.base.currentHp)} / ${this.base.maxHp}`);
-    this.weaponText.setText(`Auto Cannon  Ammo ${this.weapon.currentAmmo}/12  ${this.weapon.currentState}`);
+
+    const weaponLines = this.weapons.map((weapon) => (
+      `${weapon.name} Lv${weapon.level}  Ammo ${weapon.currentAmmo}/${weapon.magazineSize}  ${weapon.currentState}`
+    ));
+    this.weaponText.setText(weaponLines);
+
     this.debugText.setText([
-      `Speed ${this.gameSpeed}x`,
+      `Speed ${this.gameSpeed}x${this.upgradeOverlay.visible ? ' · PAUSED' : ''}`,
       `Projectiles ${this.projectilePool.activeCount}`,
       `FPS ${Math.round(this.game.loop.actualFps)}`,
+      `DMG ${this.globalDamageMultiplier.toFixed(2)}x · AS ${this.globalAttackSpeedMultiplier.toFixed(2)}x`,
       'Keys: 1-4 speed · R restart',
     ]);
   }
