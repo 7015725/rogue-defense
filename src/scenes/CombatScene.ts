@@ -17,10 +17,12 @@ import { RunState } from '../run/RunState';
 import { ProjectilePool } from '../systems/ProjectilePool';
 import { WaveManager } from '../systems/WaveManager';
 import { UpgradeOverlay } from '../ui/UpgradeOverlay';
+import { WeaponBranchOverlay } from '../ui/WeaponBranchOverlay';
 import {
   UpgradeDirectorLite,
   type UpgradeOption,
 } from '../upgrades/UpgradeDirectorLite';
+import type { WeaponBranchChoice, WeaponBranchStage } from '../weapons/WeaponProgression';
 
 export class CombatScene extends Phaser.Scene {
   private base!: Base;
@@ -29,6 +31,7 @@ export class CombatScene extends Phaser.Scene {
   private runState!: RunState;
   private upgradeDirector!: UpgradeDirectorLite;
   private upgradeOverlay!: UpgradeOverlay;
+  private branchOverlay!: WeaponBranchOverlay;
   private autoCannon!: Weapon;
   private readonly randomWeapons = new Map<RandomWeaponId, Weapon>();
   private weapons: Weapon[] = [];
@@ -65,6 +68,10 @@ export class CombatScene extends Phaser.Scene {
     this.runState = new RunState();
     this.upgradeDirector = new UpgradeDirectorLite();
     this.upgradeOverlay = new UpgradeOverlay(this, (option) => this.handleUpgradeSelection(option));
+    this.branchOverlay = new WeaponBranchOverlay(
+      this,
+      (weapon, stage, choice) => this.handleBranchSelection(weapon, stage, choice),
+    );
 
     this.autoCannon = new Weapon(
       this,
@@ -84,7 +91,7 @@ export class CombatScene extends Phaser.Scene {
   update(_time: number, delta: number): void {
     if (this.finished) return;
 
-    if (this.upgradeOverlay.visible) {
+    if (this.isChoicePaused()) {
       this.updateUi();
       return;
     }
@@ -114,7 +121,9 @@ export class CombatScene extends Phaser.Scene {
     } else if (this.waveManager.isComplete) {
       this.clearRemainingEnemies();
       this.finished = true;
-      this.showFinish('M0.3 TEST COMPLETE\nFive-weapon pool active\nPress R to restart');
+      this.showFinish('M0.4 TEST COMPLETE\nLv5 / Lv10 weapon routes active\nPress R to restart');
+    } else if (this.openPendingBranchChoice()) {
+      // Weapon milestone choices have priority over queued Run upgrades.
     } else if (this.runState.pendingUpgrades > 0) {
       this.openUpgradeChoice();
     }
@@ -127,10 +136,12 @@ export class CombatScene extends Phaser.Scene {
   }
 
   private openUpgradeChoice(): void {
+    if (this.openPendingBranchChoice()) return;
+
     const options = this.upgradeDirector.generate({
       runLevel: this.runState.level,
-      ownedWeaponIds: [...this.randomWeapons.keys()],
-      autoCannonLevel: this.autoCannon.level,
+      ownedWeapons: this.weapons.map((weapon) => ({ id: weapon.id, name: weapon.name, level: weapon.level })),
+      ownedRandomWeaponIds: [...this.randomWeapons.keys()],
       globalDamageLevel: this.globalDamageLevel,
       globalAttackSpeedLevel: this.globalAttackSpeedLevel,
       baseHpUpgradeLevel: this.baseHpUpgradeLevel,
@@ -147,21 +158,53 @@ export class CombatScene extends Phaser.Scene {
     }
 
     this.runState.consumePendingUpgrade();
-
-    if (this.runState.pendingUpgrades > 0 && !this.finished) {
-      this.openUpgradeChoice();
-    }
-
+    this.continueChoiceFlow();
     this.updateUi();
   }
 
-  private applyUpgrade(option: UpgradeOption): void {
-    if (option.weaponId) {
-      this.unlockRandomWeapon(option.weaponId);
-      return;
-    }
+  private handleBranchSelection(
+    weapon: Weapon,
+    stage: WeaponBranchStage,
+    choice: WeaponBranchChoice,
+  ): void {
+    weapon.selectBranch(stage, choice.id);
+    this.continueChoiceFlow();
+    this.updateUi();
+  }
 
-    switch (option.id) {
+  private continueChoiceFlow(): void {
+    if (this.finished) return;
+    if (this.openPendingBranchChoice()) return;
+    if (this.runState.pendingUpgrades > 0) this.openUpgradeChoice();
+  }
+
+  private openPendingBranchChoice(): boolean {
+    if (this.branchOverlay?.visible) return true;
+
+    const weapon = this.weapons.find((candidate) => candidate.pendingBranchStage !== null);
+    if (!weapon) return false;
+
+    const stage = weapon.pendingBranchStage;
+    if (!stage) return false;
+
+    const choices = weapon.getBranchChoices(stage);
+    if (choices.length === 0) return false;
+
+    this.branchOverlay.show(weapon, stage, choices);
+    return true;
+  }
+
+  private applyUpgrade(option: UpgradeOption): void {
+    switch (option.kind) {
+      case 'unlock-weapon':
+        if (option.weaponId) this.unlockRandomWeapon(option.weaponId);
+        break;
+      case 'weapon-level': {
+        if (!option.weaponId) break;
+        const weapon = this.weapons.find((candidate) => candidate.id === option.weaponId);
+        weapon?.upgradeLevel();
+        break;
+      }
       case 'global-damage':
         this.globalDamageLevel += 1;
         this.globalDamageMultiplier *= 1.10;
@@ -176,13 +219,12 @@ export class CombatScene extends Phaser.Scene {
         this.baseHpUpgradeLevel += 1;
         this.base.increaseMaxHp(1.12);
         break;
-      case 'auto-cannon-level':
-        this.autoCannon.upgradeLevel();
-        break;
     }
   }
 
-  private unlockRandomWeapon(weaponId: RandomWeaponId): void {
+  private unlockRandomWeapon(rawWeaponId: string): void {
+    if (!(rawWeaponId in RANDOM_WEAPON_DEFINITIONS)) return;
+    const weaponId = rawWeaponId as RandomWeaponId;
     if (this.randomWeapons.has(weaponId) || this.randomWeapons.size >= RANDOM_WEAPON_SLOT_POSITIONS.length) return;
 
     const position = RANDOM_WEAPON_SLOT_POSITIONS[this.randomWeapons.size];
@@ -203,6 +245,10 @@ export class CombatScene extends Phaser.Scene {
     for (const weapon of this.weapons) {
       weapon.setGlobalModifiers(this.globalDamageMultiplier, this.globalAttackSpeedMultiplier);
     }
+  }
+
+  private isChoicePaused(): boolean {
+    return this.upgradeOverlay.visible || this.branchOverlay.visible;
   }
 
   private drawBattlefield(): void {
@@ -228,7 +274,7 @@ export class CombatScene extends Phaser.Scene {
     this.runText = this.add.text(36, 218, '', style).setDepth(10);
     this.creditsText = this.add.text(36, 258, '', style).setDepth(10);
     this.baseText = this.add.text(36, BATTLEFIELD_HEIGHT - 265, '', { ...style, fontSize: '21px' }).setDepth(10);
-    this.weaponText = this.add.text(36, BATTLEFIELD_HEIGHT - 225, '', { ...style, fontSize: '17px' }).setDepth(10);
+    this.weaponText = this.add.text(36, BATTLEFIELD_HEIGHT - 225, '', { ...style, fontSize: '15px' }).setDepth(10);
     this.debugText = this.add.text(BATTLEFIELD_WIDTH - 36, 36, '', { ...style, fontSize: '22px', align: 'right' }).setOrigin(1, 0).setDepth(10);
     this.statusText = this.add.text(BATTLEFIELD_WIDTH / 2, BATTLEFIELD_HEIGHT / 2, '', {
       ...style,
@@ -247,12 +293,12 @@ export class CombatScene extends Phaser.Scene {
     this.baseText.setText(`Base HP ${Math.ceil(this.base.currentHp)} / ${this.base.maxHp}`);
 
     const weaponLines = this.weapons.map((weapon, index) => (
-      `S${index + 1} ${weapon.name} Lv${weapon.level}  Ammo ${weapon.ammoLabel}  ${weapon.currentState}`
+      `S${index + 1} ${weapon.progressionLabel} · Ammo ${weapon.ammoLabel} · ${weapon.currentState}`
     ));
     this.weaponText.setText(weaponLines);
 
     this.debugText.setText([
-      `Speed ${this.gameSpeed}x${this.upgradeOverlay.visible ? ' · PAUSED' : ''}`,
+      `Speed ${this.gameSpeed}x${this.isChoicePaused() ? ' · PAUSED' : ''}`,
       `Weapons ${this.weapons.length}/5`,
       `Projectiles ${this.projectilePool.activeCount}`,
       `FPS ${Math.round(this.game.loop.actualFps)}`,
