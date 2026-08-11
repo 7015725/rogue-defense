@@ -4,11 +4,50 @@ export type ArmorGrade = 'UNARMORED' | 'LIGHT' | 'MEDIUM' | 'HEAVY';
 export type TargetDomain = 'GROUND' | 'AIR';
 export type EnemyKind = 'infantry' | 'heavy' | 'flying' | 'boss';
 
+export type StatusType =
+  | 'BURN'
+  | 'SLOW'
+  | 'FREEZE'
+  | 'STUN'
+  | 'ARMOR_BREAK'
+  | 'CHARGED'
+  | 'SUPPRESSED';
+
+export interface StatusApplication {
+  type: StatusType;
+  durationMs: number;
+  magnitude?: number;
+  stacks?: number;
+  maxStacks?: number;
+  tickIntervalMs?: number;
+  sourceWeaponId?: string;
+}
+
+export interface StatusSnapshot {
+  type: StatusType;
+  remainingMs: number;
+  magnitude: number;
+  stacks: number;
+  tickIntervalMs: number;
+}
+
+export type DamageTag =
+  | 'PROJECTILE'
+  | 'SHOTGUN'
+  | 'EXPLOSION'
+  | 'LIGHTNING'
+  | 'HEAVY_HIT'
+  | 'SNIPER';
+
 export interface DamageContext {
   baseDamage: number;
   critChance: number;
   critMultiplier: number;
   armorPenetration: number;
+  sourceWeaponId?: string;
+  tags?: readonly DamageTag[];
+  statusApplications?: readonly StatusApplication[];
+  comboTargets?: readonly Targetable[];
 }
 
 export interface DamageResult {
@@ -28,9 +67,12 @@ export interface Targetable {
   readonly armorGrade: ArmorGrade;
   readonly currentHp: number;
   readonly maxHp: number;
+  readonly hardControlled: boolean;
   takeDamage(amount: number): void;
-  applyStun(durationMs: number): void;
-  applyArmorBreak(amount: number, durationMs: number): void;
+  applyStatus(application: StatusApplication): void;
+  hasStatus(type: StatusType): boolean;
+  getStatus(type: StatusType): StatusSnapshot | null;
+  consumeStatusStacks(type: StatusType, count: number): number;
 }
 
 export interface EnemyDefinition {
