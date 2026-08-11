@@ -30,7 +30,7 @@ html, body {
 body {
   position: fixed;
   inset: 0;
-  background: radial-gradient(circle at center, #111827 0%, #020617 72%);
+  background: #020617;
   touch-action: none;
   user-select: none;
   -webkit-user-select: none;
@@ -39,19 +39,22 @@ body {
 #app {
   width: 100dvw;
   height: 100dvh;
-  display: grid;
-  place-items: center;
+  display: block;
   padding:
     env(safe-area-inset-top)
     env(safe-area-inset-right)
     env(safe-area-inset-bottom)
     env(safe-area-inset-left);
+  background: #0f172a;
 }
 
 canvas {
   display: block;
-  max-width: 100%;
-  max-height: 100%;
+  width: 100%;
+  height: 100%;
+  max-width: none;
+  max-height: none;
+  margin: 0;
   image-rendering: pixelated;
   image-rendering: crisp-edges;
   touch-action: none;
@@ -60,11 +63,7 @@ canvas {
 
 @media (orientation: landscape) and (max-height: 700px) {
   #app {
-    place-items: center;
-  }
-
-  canvas {
-    max-width: min(100%, 100dvw);
-    max-height: 100dvh;
+    width: 100dvw;
+    height: 100dvh;
   }
 }
