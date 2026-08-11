@@ -44,35 +44,31 @@ jobs:
           npm install --no-save --no-audit --no-fund @playwright/test@1.62.1
           npx playwright install --with-deps chromium
 
-      - name: Checkpoint functional soak
-        id: functional
+      - name: RC checkpoint + Stress300 suite
+        id: suite
         shell: bash
         run: |
           set +e
-          npm run soak -- --grep "RC checkpoint soak" 2>&1 | tee functional.log
-          EXIT_CODE=${PIPESTATUS[0]}
-          echo "exit_code=$EXIT_CODE" >> "$GITHUB_OUTPUT"
-          if [ "$EXIT_CODE" -ne 0 ]; then
-            ERROR_LINE=$(grep -E 'Error:|Expected:|Received:|Timeout|Boss Shop|Functional' functional.log | head -n 1 | tr -d '\r\n' | cut -c1-180)
-            if [ -z "$ERROR_LINE" ]; then ERROR_LINE=$(tail -n 3 functional.log | tr '\n' ' ' | tr -d '\r' | cut -c1-180); fi
-            echo "error_line=$ERROR_LINE" >> "$GITHUB_OUTPUT"
-          fi
-          exit 0
+          npm run soak 2>&1 | tee soak.log
+          SUITE_EXIT=${PIPESTATUS[0]}
+          echo "suite_exit=$SUITE_EXIT" >> "$GITHUB_OUTPUT"
 
-      - name: Stress300 performance baseline
-        if: steps.functional.outputs.exit_code == '0'
-        id: perf
-        shell: bash
-        run: |
-          set +e
-          npm run soak -- --grep "Stress300 automated" 2>&1 | tee perf.log
-          EXIT_CODE=${PIPESTATUS[0]}
-          echo "exit_code=$EXIT_CODE" >> "$GITHUB_OUTPUT"
-          PERF_LINE=$(grep '^RC_PERF ' perf.log | tail -n 1 | sed 's/^RC_PERF //' | tr -d '\r\n' | cut -c1-180)
+          FUNCTIONAL_OK=1
+          if grep -q '^RC_FUNCTIONAL PASS$' soak.log; then FUNCTIONAL_OK=0; fi
+          echo "functional_exit=$FUNCTIONAL_OK" >> "$GITHUB_OUTPUT"
+
+          PERF_LINE=$(grep '^RC_PERF ' soak.log | tail -n 1 | sed 's/^RC_PERF //' | tr -d '\r\n' | cut -c1-180)
           if [ -n "$PERF_LINE" ]; then echo "perf_line=$PERF_LINE" >> "$GITHUB_OUTPUT"; fi
-          if [ "$EXIT_CODE" -ne 0 ]; then
-            ERROR_LINE=$(grep -E 'Error:|Expected:|Received:|Timeout|toBeGreaterThan' perf.log | head -n 1 | tr -d '\r\n' | cut -c1-180)
-            if [ -z "$ERROR_LINE" ]; then ERROR_LINE=$(tail -n 3 perf.log | tr '\n' ' ' | tr -d '\r' | cut -c1-180); fi
+
+          PERF_EXIT=1
+          if [ -n "$PERF_LINE" ]; then
+            PERF_EXIT=$(node -e 'const m=JSON.parse(process.argv[1]); process.stdout.write((m.W1>=15 && m.W50>=15 && m.W100>=15) ? "0" : "1")' "$PERF_LINE")
+          fi
+          echo "perf_exit=$PERF_EXIT" >> "$GITHUB_OUTPUT"
+
+          if [ "$SUITE_EXIT" -ne 0 ]; then
+            ERROR_LINE=$(grep -E 'Error:|Expected:|Received:|Timeout|Boss Shop|pageerror:|console:' soak.log | head -n 1 | tr -d '\r\n' | cut -c1-180)
+            if [ -z "$ERROR_LINE" ]; then ERROR_LINE=$(tail -n 3 soak.log | tr '\n' ' ' | tr -d '\r' | cut -c1-180); fi
             echo "error_line=$ERROR_LINE" >> "$GITHUB_OUTPUT"
           fi
           exit 0
@@ -92,11 +88,11 @@ jobs:
           GH_TOKEN: ${{ github.token }}
           REPO: ${{ github.repository }}
           SHA: ${{ github.sha }}
-          FUNCTIONAL_EXIT: ${{ steps.functional.outputs.exit_code }}
-          FUNCTIONAL_ERROR: ${{ steps.functional.outputs.error_line }}
-          PERF_EXIT: ${{ steps.perf.outputs.exit_code }}
-          PERF_ERROR: ${{ steps.perf.outputs.error_line }}
-          PERF_LINE: ${{ steps.perf.outputs.perf_line }}
+          SUITE_EXIT: ${{ steps.suite.outputs.suite_exit }}
+          FUNCTIONAL_EXIT: ${{ steps.suite.outputs.functional_exit }}
+          PERF_EXIT: ${{ steps.suite.outputs.perf_exit }}
+          PERF_LINE: ${{ steps.suite.outputs.perf_line }}
+          SUITE_ERROR: ${{ steps.suite.outputs.error_line }}
         run: |
           publish_status() {
             local state="$1"
@@ -111,7 +107,7 @@ jobs:
               -d "{\"state\":\"$state\",\"context\":\"$context\",\"description\":\"$description\"}"
           }
 
-          if [ "$FUNCTIONAL_EXIT" = "0" ]; then
+          if [ "$SUITE_EXIT" = "0" ] && [ "$FUNCTIONAL_EXIT" = "0" ]; then
             publish_status success "ci/soak-functional" "W10-W100 checkpoint chain + W101 unlock passed"
           else
             publish_status failure "ci/soak-functional" "Checkpoint functional soak failed"
@@ -122,33 +118,25 @@ jobs:
             METRIC_CONTEXT=$(printf '%s' "$PERF_LINE" | sed 's/[{}\"]//g; s/:/=/g; s/,/ /g' | cut -c1-100)
           fi
 
-          if [ "$PERF_EXIT" = "0" ]; then
-            DESC="Stress300 W1/W50/W100 Chromium baseline passed"
-            if [ -n "$PERF_LINE" ]; then DESC=$(printf 'Perf %s' "$PERF_LINE" | cut -c1-140); fi
-            publish_status success "ci/perf" "$DESC"
+          if [ "$SUITE_EXIT" = "0" ] && [ "$PERF_EXIT" = "0" ]; then
+            publish_status success "ci/perf" "Stress300 W1/W50/W100 all >= 15 FPS"
             if [ -n "$METRIC_CONTEXT" ]; then publish_status success "ci/perf-metrics $METRIC_CONTEXT" "Measured Stress300 requestAnimationFrame FPS"; fi
-          elif [ "$FUNCTIONAL_EXIT" = "0" ]; then
-            DESC="Stress300 Chromium baseline failed"
-            if [ -n "$PERF_LINE" ]; then DESC=$(printf 'Perf FAIL %s' "$PERF_LINE" | cut -c1-140); fi
-            publish_status failure "ci/perf" "$DESC"
-            if [ -n "$METRIC_CONTEXT" ]; then publish_status failure "ci/perf-metrics $METRIC_CONTEXT" "Measured Stress300 requestAnimationFrame FPS"; fi
           else
-            publish_status error "ci/perf" "Skipped because checkpoint soak failed"
+            publish_status failure "ci/perf" "Stress300 FPS threshold or measurement failed"
+            if [ -n "$METRIC_CONTEXT" ]; then publish_status failure "ci/perf-metrics $METRIC_CONTEXT" "Measured Stress300 requestAnimationFrame FPS"; fi
           fi
 
-          if [ "$FUNCTIONAL_EXIT" = "0" ] && [ "$PERF_EXIT" = "0" ]; then
+          if [ "$SUITE_EXIT" = "0" ] && [ "$FUNCTIONAL_EXIT" = "0" ] && [ "$PERF_EXIT" = "0" ]; then
             publish_status success "ci/soak" "RC checkpoint functional + Stress300 passed"
           else
             publish_status failure "ci/soak" "RC soak validation failed"
           fi
 
-          ERROR_LINE="$FUNCTIONAL_ERROR"
-          if [ -z "$ERROR_LINE" ]; then ERROR_LINE="$PERF_ERROR"; fi
-          if [ -n "$ERROR_LINE" ]; then
-            SAFE=$(printf '%s' "$ERROR_LINE" | sed 's/[^A-Za-z0-9_.:()\/ -]/_/g' | cut -c1-180)
+          if [ -n "$SUITE_ERROR" ]; then
+            SAFE=$(printf '%s' "$SUITE_ERROR" | sed 's/[^A-Za-z0-9_.:()\/ -]/_/g' | cut -c1-180)
             publish_status failure "ci/soak-error: $SAFE" "RC soak failure summary"
           fi
 
       - name: Fail workflow when soak failed
-        if: steps.functional.outputs.exit_code != '0' || steps.perf.outputs.exit_code != '0'
+        if: steps.suite.outputs.suite_exit != '0' || steps.suite.outputs.functional_exit != '0' || steps.suite.outputs.perf_exit != '0'
         run: exit 1
