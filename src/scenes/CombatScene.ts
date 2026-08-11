@@ -14,6 +14,13 @@ import type { ComboId } from '../combat/types';
 import { Base } from '../entities/Base';
 import { Enemy, type EnemyRewards } from '../entities/Enemy';
 import { Weapon } from '../entities/Weapon';
+import {
+  getDifficulty,
+  getMaxGameSpeed,
+  type PermanentSave,
+  type RunSummary,
+} from '../meta/PermanentProgress';
+import { SaveService } from '../meta/SaveService';
 import { RunState } from '../run/RunState';
 import {
   BossShopDirector,
@@ -31,6 +38,10 @@ import {
 } from '../upgrades/UpgradeDirectorLite';
 import type { WeaponBranchChoice, WeaponBranchStage } from '../weapons/WeaponProgression';
 
+interface CombatSceneData {
+  difficulty?: number;
+}
+
 export class CombatScene extends Phaser.Scene {
   private base!: Base;
   private projectilePool!: ProjectilePool;
@@ -47,7 +58,12 @@ export class CombatScene extends Phaser.Scene {
   private weapons: Weapon[] = [];
   private enemies: Enemy[] = [];
   private gameSpeed = 1;
+  private maxGameSpeed = 1;
   private finished = false;
+  private difficultyId = 1;
+  private permanentSave!: PermanentSave;
+  private kills = 0;
+  private bossKills = 0;
 
   private globalDamageMultiplier = 1;
   private globalAttackSpeedMultiplier = 1;
@@ -68,13 +84,37 @@ export class CombatScene extends Phaser.Scene {
   private baseText!: Phaser.GameObjects.Text;
   private weaponText!: Phaser.GameObjects.Text;
   private debugText!: Phaser.GameObjects.Text;
-  private statusText!: Phaser.GameObjects.Text;
 
   constructor() {
     super('CombatScene');
   }
 
+  init(data: CombatSceneData): void {
+    this.permanentSave = SaveService.load();
+    const requestedDifficulty = Math.max(1, Math.floor(data?.difficulty ?? this.permanentSave.selectedDifficulty));
+    this.difficultyId = Math.min(requestedDifficulty, this.permanentSave.maxDifficultyUnlocked);
+    this.permanentSave.selectedDifficulty = this.difficultyId;
+    SaveService.save(this.permanentSave);
+  }
+
   create(): void {
+    this.randomWeapons.clear();
+    this.activeCombos.clear();
+    this.weapons = [];
+    this.enemies = [];
+    this.kills = 0;
+    this.bossKills = 0;
+    this.finished = false;
+    this.gameSpeed = 1;
+    this.globalDamageLevel = 0;
+    this.globalAttackSpeedLevel = 0;
+    this.baseHpUpgradeLevel = 0;
+    this.currentShopWave = null;
+    this.shopItems = [];
+    this.purchasedShopIds.clear();
+    this.shopRefreshCount = 0;
+    this.pendingReplacementItem = null;
+
     this.cameras.main.setBackgroundColor(0x0f172a);
     this.drawBattlefield();
 
@@ -84,6 +124,16 @@ export class CombatScene extends Phaser.Scene {
     this.runState = new RunState();
     this.upgradeDirector = new UpgradeDirectorLite();
     this.shopDirector = new BossShopDirector();
+
+    this.globalDamageMultiplier = 1 + this.permanentSave.tech.damageTraining * 0.03;
+    this.globalAttackSpeedMultiplier = 1;
+    if (this.permanentSave.tech.baseFortification > 0) {
+      this.base.increaseMaxHp(1 + this.permanentSave.tech.baseFortification * 0.05);
+    }
+    this.runState.addCredits(this.permanentSave.tech.startingCredits * 20);
+    this.runState.addRerollCharges(this.permanentSave.tech.rerollPrep);
+    this.maxGameSpeed = getMaxGameSpeed(this.permanentSave);
+
     this.upgradeOverlay = new UpgradeOverlay(
       this,
       (option) => this.handleUpgradeSelection(option),
@@ -130,6 +180,7 @@ export class CombatScene extends Phaser.Scene {
     const simDelta = Math.min(delta, 50) * this.gameSpeed;
     const bossAlive = this.enemies.some((enemy) => enemy.alive && enemy.kind === 'boss');
     const spawnRequests = this.waveManager.update(simDelta, bossAlive);
+    const difficulty = getDifficulty(this.difficultyId);
 
     for (const request of spawnRequests) {
       this.enemies.push(new Enemy(
@@ -138,6 +189,10 @@ export class CombatScene extends Phaser.Scene {
         request.kind,
         request.laneIndex,
         (enemy, rewards) => this.handleEnemyKilled(enemy, rewards),
+        {
+          hpMultiplier: difficulty.enemyHpMultiplier,
+          damageMultiplier: difficulty.enemyDamageMultiplier,
+        },
       ));
     }
 
@@ -157,13 +212,15 @@ export class CombatScene extends Phaser.Scene {
     this.enemies = this.enemies.filter((enemy) => enemy.alive);
 
     if (!this.base.alive) {
-      this.finished = true;
-      this.showFinish('BASE DESTROYED\nPress R to restart');
-    } else if (this.waveManager.isComplete) {
+      this.finishRun('BASE_DESTROYED');
+      return;
+    }
+    if (this.waveManager.isComplete) {
       this.clearRemainingEnemies();
-      this.finished = true;
-      this.showFinish('M0.8 TEST COMPLETE\nWave 30 Boss Shop loop cleared\nPress R to restart');
-    } else if (this.openPendingBranchChoice()) {
+      this.finishRun('TEST_COMPLETE');
+      return;
+    }
+    if (this.openPendingBranchChoice()) {
       // Weapon milestone choices have priority over queued Run upgrades.
     } else if (this.runState.pendingUpgrades > 0) {
       this.openUpgradeChoice();
@@ -172,13 +229,14 @@ export class CombatScene extends Phaser.Scene {
     this.updateUi();
   }
 
-  private handleEnemyKilled(_enemy: Enemy, rewards: EnemyRewards): void {
+  private handleEnemyKilled(enemy: Enemy, rewards: EnemyRewards): void {
+    this.kills += 1;
+    if (enemy.kind === 'boss') this.bossKills += 1;
     this.runState.addRewards(rewards.xp, rewards.credits);
   }
 
   private openUpgradeChoice(): void {
     if (this.openPendingBranchChoice()) return;
-
     const options = this.upgradeDirector.generate({
       runLevel: this.runState.level,
       currentWave: this.waveManager.wave,
@@ -189,7 +247,6 @@ export class CombatScene extends Phaser.Scene {
       globalAttackSpeedLevel: this.globalAttackSpeedLevel,
       baseHpUpgradeLevel: this.baseHpUpgradeLevel,
     });
-
     this.upgradeOverlay.show(options, this.runState.getSkipReward(), this.runState.rerollCharges);
   }
 
@@ -202,17 +259,12 @@ export class CombatScene extends Phaser.Scene {
   private handleUpgradeSelection(option: UpgradeOption | null): void {
     if (option === null) this.runState.addCredits(this.runState.getSkipReward());
     else this.applyUpgrade(option);
-
     this.runState.consumePendingUpgrade();
     this.continueChoiceFlow();
     this.updateUi();
   }
 
-  private handleBranchSelection(
-    weapon: Weapon,
-    stage: WeaponBranchStage,
-    choice: WeaponBranchChoice,
-  ): void {
+  private handleBranchSelection(weapon: Weapon, stage: WeaponBranchStage, choice: WeaponBranchChoice): void {
     weapon.selectBranch(stage, choice.id);
     this.continueChoiceFlow();
     this.updateUi();
@@ -245,11 +297,9 @@ export class CombatScene extends Phaser.Scene {
       case 'unlock-weapon':
         if (option.weaponId) this.unlockRandomWeapon(option.weaponId);
         break;
-      case 'weapon-level': {
-        if (!option.weaponId) break;
-        this.weapons.find((candidate) => candidate.id === option.weaponId)?.upgradeLevel();
+      case 'weapon-level':
+        if (option.weaponId) this.weapons.find((candidate) => candidate.id === option.weaponId)?.upgradeLevel();
         break;
-      }
       case 'combo':
         if (option.comboId) {
           this.activeCombos.add(option.comboId);
@@ -310,7 +360,6 @@ export class CombatScene extends Phaser.Scene {
     if (!this.runState.spendCredits(item.cost)) return;
     this.applyShopItem(item);
     this.purchasedShopIds.add(item.id);
-
     if (!this.openPendingBranchChoice()) this.refreshBossShopView();
     this.updateUi();
   }
@@ -342,11 +391,7 @@ export class CombatScene extends Phaser.Scene {
     const item = this.pendingReplacementItem;
     this.pendingReplacementItem = null;
     if (!item || this.currentShopWave === null) return;
-    if (oldWeaponId === null) {
-      this.refreshBossShopView();
-      return;
-    }
-    if (!item.weaponId || this.runState.credits < item.cost) {
+    if (oldWeaponId === null || !item.weaponId || this.runState.credits < item.cost) {
       this.refreshBossShopView();
       return;
     }
@@ -357,7 +402,6 @@ export class CombatScene extends Phaser.Scene {
       this.refreshBossShopView();
       return;
     }
-
     if (!this.runState.spendCredits(item.cost)) return;
     this.purchasedShopIds.add(item.id);
     if (!this.openPendingBranchChoice()) this.refreshBossShopView();
@@ -366,9 +410,7 @@ export class CombatScene extends Phaser.Scene {
 
   private applyShopItem(item: BossShopItem): void {
     switch (item.kind) {
-      case 'heal-base':
-        this.base.healFraction(0.25);
-        break;
+      case 'heal-base': this.base.healFraction(0.25); break;
       case 'repair-weapon':
         if (item.weaponId) this.weapons.find((weapon) => weapon.id === item.weaponId)?.repairFull();
         break;
@@ -398,9 +440,7 @@ export class CombatScene extends Phaser.Scene {
           this.refreshWeaponModifiers();
         }
         break;
-      case 'reroll-charge':
-        this.runState.addRerollCharges(1);
-        break;
+      case 'reroll-charge': this.runState.addRerollCharges(1); break;
     }
   }
 
@@ -442,20 +482,13 @@ export class CombatScene extends Phaser.Scene {
     if (oldWeaponId === newWeaponId || this.randomWeapons.has(newWeaponId)) return false;
     const oldWeapon = this.randomWeapons.get(oldWeaponId);
     if (!oldWeapon) return false;
-
     const index = this.weapons.indexOf(oldWeapon);
     if (index < 1) return false;
     const position = { x: oldWeapon.x, y: oldWeapon.y };
     oldWeapon.destroy();
     this.randomWeapons.delete(oldWeaponId);
 
-    const replacement = new Weapon(
-      this,
-      this.projectilePool,
-      RANDOM_WEAPON_DEFINITIONS[newWeaponId],
-      position.x,
-      position.y,
-    );
+    const replacement = new Weapon(this, this.projectilePool, RANDOM_WEAPON_DEFINITIONS[newWeaponId], position.x, position.y);
     replacement.upgradeToLevel(this.shopDirector.getReplacementLevel(wave));
     this.randomWeapons.set(newWeaponId, replacement);
     this.weapons[index] = replacement;
@@ -467,7 +500,6 @@ export class CombatScene extends Phaser.Scene {
     if (!(rawWeaponId in RANDOM_WEAPON_DEFINITIONS)) return;
     const weaponId = rawWeaponId as RandomWeaponId;
     if (this.randomWeapons.has(weaponId) || this.randomWeapons.size >= RANDOM_WEAPON_SLOT_POSITIONS.length) return;
-
     const position = RANDOM_WEAPON_SLOT_POSITIONS[this.randomWeapons.size];
     const weapon = new Weapon(this, this.projectilePool, RANDOM_WEAPON_DEFINITIONS[weaponId], position.x, position.y);
     this.randomWeapons.set(weaponId, weapon);
@@ -516,53 +548,78 @@ export class CombatScene extends Phaser.Scene {
     this.baseText = this.add.text(36, BATTLEFIELD_HEIGHT - 265, '', { ...style, fontSize: '21px' }).setDepth(10);
     this.weaponText = this.add.text(36, BATTLEFIELD_HEIGHT - 225, '', { ...style, fontSize: '14px' }).setDepth(10);
     this.debugText = this.add.text(BATTLEFIELD_WIDTH - 36, 36, '', { ...style, fontSize: '19px', align: 'right' }).setOrigin(1, 0).setDepth(10);
-    this.statusText = this.add.text(BATTLEFIELD_WIDTH / 2, BATTLEFIELD_HEIGHT / 2, '', {
-      ...style, fontSize: '44px', align: 'center', backgroundColor: '#020617cc', padding: { x: 28, y: 22 },
-    }).setOrigin(0.5).setDepth(20).setVisible(false);
+
+    const endButton = this.add.rectangle(BATTLEFIELD_WIDTH - 130, 330, 210, 62, 0x3f3f46)
+      .setStrokeStyle(3, 0x71717a)
+      .setInteractive({ useHandCursor: true })
+      .setDepth(10);
+    const endText = this.add.text(BATTLEFIELD_WIDTH - 130, 330, '结束本局 [E]', {
+      fontFamily: 'monospace', fontSize: '18px', color: '#e4e4e7',
+    }).setOrigin(0.5).setDepth(10);
+    endButton.on('pointerup', () => this.finishRun('VOLUNTARY_EXIT'));
+    endButton.on('pointerover', () => endButton.setAlpha(0.8));
+    endButton.on('pointerout', () => endButton.setAlpha(1));
+    endText.setInteractive({ useHandCursor: true }).on('pointerup', () => this.finishRun('VOLUNTARY_EXIT'));
   }
 
   private updateUi(): void {
     const heavyCount = this.enemies.filter((enemy) => enemy.kind === 'heavy').length;
     const airCount = this.enemies.filter((enemy) => enemy.domain === 'AIR').length;
     const hasSecondaryAa = [...this.randomWeapons.keys()].some((id) => id === 'lmg' || id === 'sniper');
+    const difficulty = getDifficulty(this.difficultyId);
 
-    this.waveText.setText(`Wave ${this.waveManager.wave}${this.waveManager.isBossWave ? '  BOSS GATE' : ''}`);
+    this.waveText.setText(`Difficulty ${difficulty.label} · Wave ${this.waveManager.wave}${this.waveManager.isBossWave ? '  BOSS GATE' : ''}`);
     this.enemyText.setText(`Enemies ${this.enemies.length}${heavyCount > 0 ? ` · Heavy ${heavyCount}` : ''}${airCount > 0 ? ` · Air ${airCount}` : ''}`);
     this.runText.setText(`Run Lv ${this.runState.level}  EXP ${this.runState.xp}/${this.runState.xpToNextLevel}`);
     this.creditsText.setText(`Credits ${this.runState.credits} · Reroll ${this.runState.rerollCharges}`);
     this.baseText.setText(`Base HP ${Math.ceil(this.base.currentHp)} / ${this.base.maxHp}`);
-
     this.weaponText.setText(this.weapons.map((weapon, index) => (
       `S${index + 1} ${weapon.progressionLabel} · HP ${Math.ceil(weapon.currentHp)}/${weapon.maxHp} · Ammo ${weapon.ammoLabel} · ${weapon.currentState}`
     )));
 
     this.debugText.setText([
-      `Speed ${this.gameSpeed}x${this.isChoicePaused() ? ' · PAUSED' : ''}`,
+      `Speed ${this.gameSpeed}x / ${this.maxGameSpeed}x${this.isChoicePaused() ? ' · PAUSED' : ''}`,
+      `Kills ${this.kills} · Boss ${this.bossKills}`,
       `Weapons ${this.weapons.length}/5 · Secondary AA ${hasSecondaryAa ? 'YES' : 'NO'}`,
       `Combos ${this.activeCombos.size}/4`,
       `Projectiles ${this.projectilePool.activeCount}`,
       `FPS ${Math.round(this.game.loop.actualFps)}`,
-      `DMG ${this.globalDamageMultiplier.toFixed(2)}x · AS ${this.globalAttackSpeedMultiplier.toFixed(2)}x`,
-      'Keys: 1-4 speed · R restart',
+      `Meta DMG +${this.permanentSave.tech.damageTraining * 3}%`,
+      'Keys: 1-4 speed · E settle',
     ]);
   }
 
   private bindControls(): void {
     const keyboard = this.input.keyboard;
     if (!keyboard) return;
-    keyboard.on('keydown-ONE', () => { this.gameSpeed = 1; });
-    keyboard.on('keydown-TWO', () => { this.gameSpeed = 2; });
-    keyboard.on('keydown-THREE', () => { this.gameSpeed = 3; });
-    keyboard.on('keydown-FOUR', () => { this.gameSpeed = 4; });
-    keyboard.on('keydown-R', () => this.scene.restart());
+    keyboard.on('keydown-ONE', () => this.setGameSpeed(1));
+    keyboard.on('keydown-TWO', () => this.setGameSpeed(2));
+    keyboard.on('keydown-THREE', () => this.setGameSpeed(3));
+    keyboard.on('keydown-FOUR', () => this.setGameSpeed(4));
+    keyboard.on('keydown-E', () => this.finishRun('VOLUNTARY_EXIT'));
+  }
+
+  private setGameSpeed(speed: number): void {
+    this.gameSpeed = Math.max(1, Math.min(this.maxGameSpeed, Math.floor(speed)));
+  }
+
+  private finishRun(reason: RunSummary['reason']): void {
+    if (this.finished) return;
+    this.finished = true;
+    this.clearRemainingEnemies();
+    const summary: RunSummary = {
+      difficulty: this.difficultyId,
+      highestWave: Math.min(30, this.waveManager.wave),
+      runLevel: this.runState.level,
+      kills: this.kills,
+      bossKills: this.bossKills,
+      reason,
+    };
+    this.scene.start('SettlementScene', { summary });
   }
 
   private clearRemainingEnemies(): void {
     for (const enemy of this.enemies) enemy.destroy();
     this.enemies = [];
-  }
-
-  private showFinish(message: string): void {
-    this.statusText.setText(message).setVisible(true);
   }
 }
