@@ -5,6 +5,7 @@ import { isRuntimeProbeEnabled, publishRuntimeProbe } from './dev/RuntimeProbe';
 import { CombatScene } from './scenes/CombatScene';
 import { MainMenuScene } from './scenes/MainMenuScene';
 import { SettlementScene } from './scenes/SettlementScene';
+import { installCombatMobileLayout } from './ui/CombatMobileLayout';
 
 const config: Phaser.Types.Core.GameConfig = {
   type: Phaser.AUTO,
@@ -23,6 +24,7 @@ const config: Phaser.Types.Core.GameConfig = {
 };
 
 const game = new Phaser.Game(config);
+installCombatMobileLayout(game);
 
 if (isRuntimeProbeEnabled()) {
   const devWindow = window as Window & { __rogueDefenseGame?: Phaser.Game };
