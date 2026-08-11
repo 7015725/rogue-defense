@@ -2,8 +2,10 @@
 
 ## 当前里程碑
 
+- [`m0.8-design.md`](m0.8-design.md)：Boss Checkpoint Shop、5 格商品、刷新经济、武器耐久、满槽替换与 Reroll Charge。
+- [`m0.8-validation.md`](m0.8-validation.md)：M0.8 自动构建、Boss Shop、替换、耐久、刷新与回归验证清单。
 - [`m0.7-design.md`](m0.7-design.md)：统一 StatusEffectSystem、Boss Hard Control Resistance、首批 4 个 Combo 与三选一卡池接入。
-- [`m0.7-validation.md`](m0.7-validation.md)：M0.7 自动构建、状态行为、Combo 触发与回归验证清单。
+- [`m0.7-validation.md`](m0.7-validation.md)：M0.7 验证记录。
 - [`m0.6-design.md`](m0.6-design.md)：TargetDomain、AirPath、Recon Drone、Wave 20 空中护航与防空随机保护。
 - [`m0.6-validation.md`](m0.6-validation.md)：M0.6 验证记录。
 - [`m0.5-design.md`](m0.5-design.md)：Armor Grade、Heavy Enemy、ArmorSystem、穿甲路线与 ArmorBreak 接口。
