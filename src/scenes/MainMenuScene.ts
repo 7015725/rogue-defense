@@ -8,9 +8,15 @@ import {
 import { SaveService } from '../meta/SaveService';
 import { TECH_DEFINITIONS, TechTree } from '../meta/TechTree';
 
+const DEV_WAVE_PRESETS = [1, 10, 20, 50, 80, 100] as const;
+
 export class MainMenuScene extends Phaser.Scene {
   private save!: PermanentSave;
   private root!: Phaser.GameObjects.Container;
+  private readonly devToolsEnabled = import.meta.env.DEV
+    || new URLSearchParams(window.location.search).get('dev') === '1';
+  private devStartWave = 1;
+  private devStressCount = 0;
 
   constructor() {
     super('MainMenuScene');
@@ -51,6 +57,8 @@ export class MainMenuScene extends Phaser.Scene {
       color: '#e2e8f0',
       lineSpacing: 10,
     }));
+
+    if (this.devToolsEnabled) this.renderDevLaunchPanel();
 
     this.root.add(this.add.text(54, 390, '难度', {
       fontFamily: 'monospace', fontSize: '32px', color: '#f8fafc', fontStyle: 'bold',
@@ -93,9 +101,16 @@ export class MainMenuScene extends Phaser.Scene {
       { fontFamily: 'monospace', fontSize: '19px', color: '#93c5fd' },
     ));
 
-    this.addButton(BATTLEFIELD_WIDTH / 2, 675, 620, 110, '开始一局', 0x1d4ed8, () => {
+    const devSuffix = this.devToolsEnabled
+      ? ` · DEV W${this.devStartWave}${this.devStressCount > 0 ? ` + ${this.devStressCount} Stress` : ''}`
+      : '';
+    this.addButton(BATTLEFIELD_WIDTH / 2, 675, 620, 110, `开始一局${devSuffix}`, 0x1d4ed8, () => {
       SaveService.save(this.save);
-      this.scene.start('CombatScene', { difficulty: this.save.selectedDifficulty });
+      this.scene.start('CombatScene', {
+        difficulty: this.save.selectedDifficulty,
+        startWave: this.devToolsEnabled ? this.devStartWave : 1,
+        stressCount: this.devToolsEnabled ? this.devStressCount : 0,
+      });
     });
 
     this.root.add(this.add.text(54, 790, '局外科技', {
@@ -140,6 +155,42 @@ export class MainMenuScene extends Phaser.Scene {
     });
   }
 
+  private renderDevLaunchPanel(): void {
+    this.root.add(this.add.text(650, 228, 'DEV LAUNCH', {
+      fontFamily: 'monospace', fontSize: '17px', color: '#fbbf24', fontStyle: 'bold',
+    }));
+
+    DEV_WAVE_PRESETS.forEach((wave, index) => {
+      const column = index % 3;
+      const row = Math.floor(index / 3);
+      this.addSmallButton(
+        700 + column * 105,
+        270 + row * 52,
+        92,
+        42,
+        `W${wave}`,
+        this.devStartWave === wave ? 0x92400e : 0x3f3f46,
+        () => {
+          this.devStartWave = wave;
+          this.render();
+        },
+      );
+    });
+
+    this.addSmallButton(
+      910,
+      350,
+      160,
+      42,
+      this.devStressCount > 0 ? 'Stress 300 ON' : 'Stress 300 OFF',
+      this.devStressCount > 0 ? 0x9a3412 : 0x3f3f46,
+      () => {
+        this.devStressCount = this.devStressCount > 0 ? 0 : 300;
+        this.render();
+      },
+    );
+  }
+
   private addButton(
     x: number,
     y: number,
@@ -157,6 +208,25 @@ export class MainMenuScene extends Phaser.Scene {
     }).setOrigin(0.5);
     button.on('pointerover', () => button.setAlpha(0.82));
     button.on('pointerout', () => button.setAlpha(1));
+    button.on('pointerup', onClick);
+    this.root.add([button, text]);
+  }
+
+  private addSmallButton(
+    x: number,
+    y: number,
+    width: number,
+    height: number,
+    label: string,
+    color: number,
+    onClick: () => void,
+  ): void {
+    const button = this.add.rectangle(x, y, width, height, color)
+      .setStrokeStyle(2, 0xfbbf24)
+      .setInteractive({ useHandCursor: true });
+    const text = this.add.text(x, y, label, {
+      fontFamily: 'monospace', fontSize: '14px', color: '#fef3c7', fontStyle: 'bold',
+    }).setOrigin(0.5);
     button.on('pointerup', onClick);
     this.root.add([button, text]);
   }
