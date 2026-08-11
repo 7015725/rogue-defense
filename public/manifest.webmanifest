@@ -1,0 +1,19 @@
+{
+  "name": "Rogue Defense",
+  "short_name": "Rogue Defense",
+  "description": "Single-player vertical Roguelite tower defense.",
+  "start_url": "./",
+  "scope": "./",
+  "display": "standalone",
+  "orientation": "any",
+  "background_color": "#020617",
+  "theme_color": "#111827",
+  "icons": [
+    {
+      "src": "./icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ]
+}
