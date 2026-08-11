@@ -2,8 +2,10 @@
 
 ## 当前里程碑
 
+- [`m0.9-design.md`](m0.9-design.md)：Settlement、Account Lv、Gold / Tech Point、Tech Tree、Difficulty 与 Versioned Local Save。
+- [`m0.9-validation.md`](m0.9-validation.md)：M0.9 自动构建、结算、存档、局外科技、难度和完整闭环验证清单。
 - [`m0.8-design.md`](m0.8-design.md)：Boss Checkpoint Shop、5 格商品、刷新经济、武器耐久、满槽替换与 Reroll Charge。
-- [`m0.8-validation.md`](m0.8-validation.md)：M0.8 自动构建、Boss Shop、替换、耐久、刷新与回归验证清单。
+- [`m0.8-validation.md`](m0.8-validation.md)：M0.8 验证记录。
 - [`m0.7-design.md`](m0.7-design.md)：统一 StatusEffectSystem、Boss Hard Control Resistance、首批 4 个 Combo 与三选一卡池接入。
 - [`m0.7-validation.md`](m0.7-validation.md)：M0.7 验证记录。
 - [`m0.6-design.md`](m0.6-design.md)：TargetDomain、AirPath、Recon Drone、Wave 20 空中护航与防空随机保护。
@@ -31,3 +33,4 @@
 - 具体数值在原型测试前视为可调参数，不与机制规则混为一谈。
 - 每个里程碑完成后更新 `decision-log.md`。
 - 大型专项系统优先拆分独立文档，避免总稿无限膨胀。
+- M0.9 之后不再扩主要系统，优先处理 V0.1 Integration / Playtest / Balance / Performance。
