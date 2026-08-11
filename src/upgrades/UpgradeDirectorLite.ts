@@ -69,10 +69,10 @@ const BASE_OPTIONS: readonly UpgradeOption[] = [
 ];
 
 const WEAPON_DESCRIPTIONS: Record<RandomWeaponId, string> = {
-  lmg: '高频持续火力 · 可对空\n独立弹匣与 Reload',
-  sniper: '全场高伤单体 · 可对空\n优先最高 HP 目标',
-  'auto-gl': '延迟落点爆炸 · 仅地面\n中距离范围伤害',
-  tesla: '短距连锁电击 · 仅地面\n3 目标 + Stun / Charged',
+  lmg: '定位：持续火力 · 可对空\n全场锁定 · 60 发弹匣，耗尽后换弹',
+  sniper: '定位：高伤单体 · 可对空\n全场锁定 · 优先最高 HP，高暴击低射速',
+  'auto-gl': '定位：范围爆炸 · 仅地面\n全场锁定 · 延迟落点后造成范围伤害',
+  tesla: '定位：连锁控制 · 仅地面\n主目标全场锁定 · 近距连锁并施加充能/眩晕',
 };
 
 const SECONDARY_AA_IDS = new Set<RandomWeaponId>(['lmg', 'sniper']);
@@ -180,7 +180,7 @@ export class UpgradeDirectorLite {
         return {
           id: `unlock:${weaponId}`,
           kind: 'unlock-weapon' as const,
-          title: RANDOM_WEAPON_DEFINITIONS[weaponId].name,
+          title: `新武器 · ${RANDOM_WEAPON_DEFINITIONS[weaponId].name}`,
           description: WEAPON_DESCRIPTIONS[weaponId],
           rarity: 'RARE' as const,
           weight: baseWeight * antiAirBoost,
@@ -201,8 +201,8 @@ export class UpgradeDirectorLite {
         id: 'combo:CONCUSSIVE_BREAK',
         kind: 'combo',
         comboId: 'CONCUSSIVE_BREAK',
-        title: '震荡破甲',
-        description: 'Hard Control + Heavy Hit\n目标获得 Armor Break 35 / 4s',
+        title: '联动 · 震荡破甲',
+        description: '武器：Tesla Coil + Bolt-Action Sniper\n触发：目标被 Tesla 眩晕时，Sniper 命中\n效果：护甲 -35，持续 4 秒',
         rarity: 'RARE',
         weight: 4,
       });
@@ -213,8 +213,8 @@ export class UpgradeDirectorLite {
         id: 'combo:OVERLOAD',
         kind: 'combo',
         comboId: 'OVERLOAD',
-        title: '电力过载',
-        description: 'Charged + Lightning\n追加伤害并向附近目标溢出电弧',
+        title: '联动 · 电力过载',
+        description: '武器：Tesla Coil\n触发：已带“充能”的目标再次被 Tesla 命中\n效果：额外 35% 伤害，并电弧溅射最近敌人',
         rarity: 'RARE',
         weight: 4,
       });
@@ -225,8 +225,8 @@ export class UpgradeDirectorLite {
         id: 'combo:CONTROL_EXECUTION',
         kind: 'combo',
         comboId: 'CONTROL_EXECUTION',
-        title: '控制处决',
-        description: 'Hard Control + Sniper Critical\n追加 75% 本次有效伤害',
+        title: '联动 · 控制处决',
+        description: '武器：Tesla Coil + Bolt-Action Sniper\n触发：目标被 Tesla 眩晕时，Sniper 暴击\n效果：追加本次最终伤害的 75%',
         rarity: 'RARE',
         weight: 4,
       });
