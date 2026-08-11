@@ -134,6 +134,7 @@ test('RC checkpoint soak validates W10-W100 Boss Shop chain and W101 difficulty 
   expect(save.maxDifficultyUnlocked).toBe(2);
   expect(save.highWaveByDifficulty?.[0] ?? 0).toBeGreaterThanOrEqual(101);
   expect(save.lifetime?.runs).toBe(1);
+  console.log('RC_FUNCTIONAL PASS');
 });
 
 async function selectDevWave(page: Page, wave: 1 | 50 | 100): Promise<void> {
