@@ -10,7 +10,17 @@ import {
   INFANTRY,
   LANE_OFFSETS,
 } from '../combat/constants';
-import type { ArmorGrade, EnemyDefinition, EnemyKind, Targetable, TargetDomain } from '../combat/types';
+import type {
+  ArmorGrade,
+  EnemyDefinition,
+  EnemyKind,
+  StatusApplication,
+  StatusSnapshot,
+  StatusType,
+  Targetable,
+  TargetDomain,
+} from '../combat/types';
+import { StatusEffectSystem } from '../systems/StatusEffectSystem';
 import type { Base } from './Base';
 
 export interface EnemyRewards {
@@ -33,8 +43,6 @@ export class Enemy implements Targetable {
   readonly domain: TargetDomain;
 
   private readonly baseArmor: number;
-  private armorBreakAmount = 0;
-  private armorBreakTimerMs = 0;
   private hp: number;
   private readonly maxHpValue: number;
   private readonly moveSpeed: number;
@@ -42,13 +50,14 @@ export class Enemy implements Targetable {
   private readonly attackIntervalMs: number;
   private readonly rewards: EnemyRewards;
   private attackTimerMs = 0;
-  private stunTimerMs = 0;
   private readonly spawnX: number;
   private readonly airPhase: number;
   private readonly shape: Phaser.GameObjects.Rectangle;
   private readonly healthBar: Phaser.GameObjects.Rectangle;
   private readonly armorBadge: Phaser.GameObjects.Text | null;
   private readonly domainBadge: Phaser.GameObjects.Text | null;
+  private readonly statusBadge: Phaser.GameObjects.Text;
+  private readonly statusEffects: StatusEffectSystem;
   private dead = false;
 
   constructor(
@@ -68,6 +77,7 @@ export class Enemy implements Targetable {
     this.attackDamage = stats.attackDamage;
     this.attackIntervalMs = stats.attackIntervalMs;
     this.rewards = { xp: stats.xp, credits: stats.credits };
+    this.statusEffects = new StatusEffectSystem(kind === 'boss', (amount) => this.takeDamage(amount));
 
     const laneOffsets = this.domain === 'AIR' ? AIR_LANE_OFFSETS : LANE_OFFSETS;
     this.spawnX = BASE_X + laneOffsets[laneIndex % laneOffsets.length];
@@ -105,14 +115,23 @@ export class Enemy implements Targetable {
         padding: { x: 5, y: 2 },
       }).setOrigin(0.5)
       : null;
+
+    this.statusBadge = scene.add.text(this.spawnX, ENEMY_SPAWN_Y - stats.size * 1.05, '', {
+      fontFamily: 'monospace',
+      fontSize: '11px',
+      color: '#fef3c7',
+      backgroundColor: '#020617bb',
+      padding: { x: 3, y: 1 },
+    }).setOrigin(0.5).setVisible(false);
   }
 
   get x(): number { return this.shape.x; }
   get y(): number { return this.shape.y; }
   get alive(): boolean { return !this.dead; }
-  get armor(): number { return Math.max(0, this.baseArmor - this.armorBreakAmount); }
+  get armor(): number { return Math.max(0, this.baseArmor - this.statusEffects.armorBreakAmount); }
   get currentHp(): number { return this.hp; }
   get maxHp(): number { return this.maxHpValue; }
+  get hardControlled(): boolean { return this.statusEffects.hardControlled; }
 
   get pathProgress(): number {
     return Phaser.Math.Clamp((this.y - ENEMY_SPAWN_Y) / (BASE_ATTACK_Y - ENEMY_SPAWN_Y), 0, 1);
@@ -121,19 +140,16 @@ export class Enemy implements Targetable {
   update(deltaMs: number): void {
     if (this.dead) return;
 
-    if (this.armorBreakTimerMs > 0) {
-      this.armorBreakTimerMs = Math.max(0, this.armorBreakTimerMs - deltaMs);
-      if (this.armorBreakTimerMs === 0) this.armorBreakAmount = 0;
-    }
+    this.statusEffects.update(deltaMs);
+    if (this.dead) return;
+    this.updateStatusBadge();
 
-    if (this.stunTimerMs > 0) {
-      this.stunTimerMs = Math.max(0, this.stunTimerMs - deltaMs);
-      return;
-    }
+    if (this.statusEffects.movementBlocked) return;
 
     if (this.y < BASE_ATTACK_Y) {
+      const effectiveMoveSpeed = this.moveSpeed * this.statusEffects.moveSpeedMultiplier;
       const nextProgress = Phaser.Math.Clamp(
-        (this.y + this.moveSpeed * (deltaMs / 1000) - ENEMY_SPAWN_Y) / (BASE_ATTACK_Y - ENEMY_SPAWN_Y),
+        (this.y + effectiveMoveSpeed * (deltaMs / 1000) - ENEMY_SPAWN_Y) / (BASE_ATTACK_Y - ENEMY_SPAWN_Y),
         0,
         1,
       );
@@ -146,8 +162,9 @@ export class Enemy implements Targetable {
     }
 
     this.attackTimerMs += deltaMs;
-    while (this.attackTimerMs >= this.attackIntervalMs && this.base.alive) {
-      this.attackTimerMs -= this.attackIntervalMs;
+    const effectiveAttackInterval = this.attackIntervalMs / this.statusEffects.attackSpeedMultiplier;
+    while (this.attackTimerMs >= effectiveAttackInterval && this.base.alive) {
+      this.attackTimerMs -= effectiveAttackInterval;
       this.base.takeDamage(this.attackDamage);
     }
   }
@@ -164,15 +181,24 @@ export class Enemy implements Targetable {
     }
   }
 
-  applyStun(durationMs: number): void {
+  applyStatus(application: StatusApplication): void {
     if (this.dead) return;
-    this.stunTimerMs = Math.max(this.stunTimerMs, Math.max(0, durationMs));
+    this.statusEffects.apply(application);
+    this.updateStatusBadge();
   }
 
-  applyArmorBreak(amount: number, durationMs: number): void {
-    if (this.dead) return;
-    this.armorBreakAmount = Math.max(this.armorBreakAmount, Math.max(0, amount));
-    this.armorBreakTimerMs = Math.max(this.armorBreakTimerMs, Math.max(0, durationMs));
+  hasStatus(type: StatusType): boolean {
+    return this.statusEffects.has(type);
+  }
+
+  getStatus(type: StatusType): StatusSnapshot | null {
+    return this.statusEffects.get(type);
+  }
+
+  consumeStatusStacks(type: StatusType, count: number): number {
+    const consumed = this.statusEffects.consumeStacks(type, count);
+    this.updateStatusBadge();
+    return consumed;
   }
 
   destroy(): void {
@@ -202,10 +228,17 @@ export class Enemy implements Targetable {
     this.healthBar.scaleX = ratio;
   }
 
+  private updateStatusBadge(): void {
+    if (this.dead || !this.statusBadge.scene) return;
+    const label = this.statusEffects.label;
+    this.statusBadge.setText(label).setVisible(label.length > 0);
+  }
+
   private syncDecorations(): void {
     this.healthBar.setPosition(this.shape.x, this.shape.y - this.shape.height * 0.72);
     this.armorBadge?.setPosition(this.shape.x, this.shape.y + this.shape.height * 0.72);
     this.domainBadge?.setPosition(this.shape.x, this.shape.y + this.shape.height * 0.85);
+    this.statusBadge.setPosition(this.shape.x, this.shape.y - this.shape.height * 1.05);
   }
 
   private destroyVisuals(): void {
@@ -213,5 +246,6 @@ export class Enemy implements Targetable {
     this.healthBar.destroy();
     this.armorBadge?.destroy();
     this.domainBadge?.destroy();
+    this.statusBadge.destroy();
   }
 }
