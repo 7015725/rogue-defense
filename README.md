@@ -4,30 +4,29 @@
 
 ## 当前阶段
 
-**M0.5 — Armor + Heavy Armored Enemy**
+**M0.6 — Air + Anti-Air**
 
 当前原型已经具备：
 
 - 1000×1600 纵向战场；
-- 敌人从顶部向下推进；
 - 30 秒固定 Wave 与残怪堆积；
-- Wave 10 Boss Gate；
+- Wave 10 / 20 Boss Gate；
 - Run EXP / Run Level / Credits；
 - Level Up 完全暂停；
 - 三选一与 Skip → Credits；
 - Slot 1 固定 Auto Cannon + 4 个随机武器槽；
 - 五种随机武器池：LMG、Shotgun、Sniper、Auto-GL、Tesla；
 - 所有 6 把武器可独立 Lv1～10；
-- Lv5 α / β / γ 免费路线选择；
-- Lv10 当前路线内三选一专精；
-- BranchEffect 可改变 Damage / AttackSpeed / Range / Magazine / Reload / Crit / ArmorPen / WeaponMode / AOE / Chain / MultiShot 等；
-- Armor Grade：UNARMORED / LIGHT / MEDIUM / HEAVY；
-- 独立 ArmorSystem：`Armor / (Armor + 100)`；
-- Heavy Armored Enemy：HP 220 / Armor 100 / MoveSpeed 36；
-- Wave 6～9 开始混入 Heavy；
-- Heavy 与 Boss 显示护甲等级标签；
-- Auto Cannon / LMG / Slug Shotgun / Sniper 的穿甲路线正式参与克制；
-- `applyArmorBreak()` 临时破甲接口预留；
+- Lv5 α / β / γ 路线 + Lv10 路线专精；
+- Armor Grade / ArmorSystem / Heavy Armored Enemy；
+- TargetDomain：GROUND / AIR；
+- 独立 GroundPath / AirPath；
+- Recon Drone：Wave 20 首次出现；
+- Auto Cannon / LMG / Sniper 可对空；
+- Shotgun / Auto-GL / Tesla 仅攻击地面；
+- Cone / AOE / Chain / Split Target 全部遵守 TargetDomain；
+- Wave 15+ 缺副防空时提高 LMG / Sniper 权重；
+- Wave 18+ 仍缺副防空时保证下一次升级展示 LMG 或 Sniper；
 - 1× / 2× / 3× / 4× 模拟速度。
 
 复杂 Burn、Smoke Debuff、正式 Stun Resistance 与 Combo 状态逻辑仍保留到 M0.7。
@@ -68,8 +67,9 @@ npm run build
 ## 文档
 
 - [设计文档索引](docs/README.md)
+- [M0.6 设计](docs/m0.6-design.md)
+- [M0.6 验证清单](docs/m0.6-validation.md)
 - [M0.5 设计](docs/m0.5-design.md)
-- [M0.5 验证清单](docs/m0.5-validation.md)
 - [M0.4 设计](docs/m0.4-design.md)
 - [V0.2 游戏系统设计总稿](docs/game-design-v0.2.md)
 - [V0.1 升级卡池 V1](docs/upgrade-card-pool-v0.1.md)
@@ -83,8 +83,8 @@ M0.1  基础战斗                     ✓
 M0.2  Run EXP + 三选一 + LMG       ✓
 M0.3  5 种随机武器                 ✓
 M0.4  Lv1～10 + Lv5/Lv10 路线      ✓
-M0.5  Armor + 重甲                 ← 当前
-M0.6  Air + 防空
+M0.5  Armor + 重甲                 ✓
+M0.6  Air + 防空                   ← 当前
 M0.7  Status + Combo
 M0.8  Boss Shop
 M0.9  结算 + 科技树 + Save
