@@ -113,6 +113,8 @@ export interface WeaponDefinition {
   readonly reloadTimeMs: number;
   readonly critChance: number;
   readonly critMultiplier: number;
+  readonly maxHp: number;
+  readonly autoRepairPerSecond: number;
   readonly color: number;
   readonly coneAngleDeg?: number;
   readonly pelletCount?: number;
