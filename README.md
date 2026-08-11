@@ -4,7 +4,7 @@
 
 ## 当前阶段
 
-**M0.4 — Weapon Lv1–10 + Lv5/Lv10 Routes**
+**M0.5 — Armor + Heavy Armored Enemy**
 
 当前原型已经具备：
 
@@ -18,16 +18,19 @@
 - Slot 1 固定 Auto Cannon + 4 个随机武器槽；
 - 五种随机武器池：LMG、Shotgun、Sniper、Auto-GL、Tesla；
 - 所有 6 把武器可独立 Lv1～10；
-- Lv5 自动触发 α / β / γ 免费路线选择；
-- Lv10 自动触发当前路线内 3 选 1 专精；
-- 路线选择期间战斗完全暂停且不消耗额外升级次数；
+- Lv5 α / β / γ 免费路线选择；
+- Lv10 当前路线内三选一专精；
 - BranchEffect 可改变 Damage / AttackSpeed / Range / Magazine / Reload / Crit / ArmorPen / WeaponMode / AOE / Chain / MultiShot 等；
-- Shotgun 独头弹可切换攻击模式；
-- Auto-GL 弹跳榴弹可连续爆炸；
-- Tesla 地面放电可切换为径向 AOE；
+- Armor Grade：UNARMORED / LIGHT / MEDIUM / HEAVY；
+- 独立 ArmorSystem：`Armor / (Armor + 100)`；
+- Heavy Armored Enemy：HP 220 / Armor 100 / MoveSpeed 36；
+- Wave 6～9 开始混入 Heavy；
+- Heavy 与 Boss 显示护甲等级标签；
+- Auto Cannon / LMG / Slug Shotgun / Sniper 的穿甲路线正式参与克制；
+- `applyArmorBreak()` 临时破甲接口预留；
 - 1× / 2× / 3× / 4× 模拟速度。
 
-复杂 Burn、Smoke Debuff、正式 Stun Resistance 等统一状态逻辑仍保留到 M0.7。
+复杂 Burn、Smoke Debuff、正式 Stun Resistance 与 Combo 状态逻辑仍保留到 M0.7。
 
 ## 技术栈
 
@@ -65,8 +68,9 @@ npm run build
 ## 文档
 
 - [设计文档索引](docs/README.md)
+- [M0.5 设计](docs/m0.5-design.md)
+- [M0.5 验证清单](docs/m0.5-validation.md)
 - [M0.4 设计](docs/m0.4-design.md)
-- [M0.4 验证清单](docs/m0.4-validation.md)
 - [V0.2 游戏系统设计总稿](docs/game-design-v0.2.md)
 - [V0.1 升级卡池 V1](docs/upgrade-card-pool-v0.1.md)
 - [Upgrade Director V1](docs/upgrade-director-v1.md)
@@ -78,8 +82,8 @@ npm run build
 M0.1  基础战斗                     ✓
 M0.2  Run EXP + 三选一 + LMG       ✓
 M0.3  5 种随机武器                 ✓
-M0.4  Lv1～10 + Lv5/Lv10 路线      ← 当前
-M0.5  Armor + 重甲
+M0.4  Lv1～10 + Lv5/Lv10 路线      ✓
+M0.5  Armor + 重甲                 ← 当前
 M0.6  Air + 防空
 M0.7  Status + Combo
 M0.8  Boss Shop
