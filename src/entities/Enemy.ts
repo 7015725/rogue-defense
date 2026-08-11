@@ -46,10 +46,14 @@ const ARMOR_LABELS: Record<ArmorGrade, string> = {
 const STATUS_BADGE_REFRESH_MS = 150;
 const CROWD_LOD_ENABLE_COUNT = 180;
 const CROWD_LOD_DISABLE_COUNT = 140;
+const CROWD_RENDER_REFRESH_MS = 50;
 
 export class Enemy implements Targetable {
   private static readonly activeInstances = new Set<Enemy>();
   private static crowdModeEnabled = false;
+  private static crowdGraphics: Phaser.GameObjects.Graphics | null = null;
+  private static crowdRendererScene: Phaser.Scene | null = null;
+  private static crowdRenderAccumulatorMs = 0;
 
   readonly id = nextEnemyId++;
   readonly armorGrade: ArmorGrade;
@@ -110,10 +114,13 @@ export class Enemy implements Targetable {
     this.airPhase = (laneIndex % laneOffsets.length) * 0.9;
 
     this.shape = scene.add.rectangle(this.spawnX, ENEMY_SPAWN_Y, stats.size, stats.size, stats.color)
-      .setStrokeStyle(kind === 'heavy' ? 6 : 4, this.domain === 'AIR' ? 0xbae6fd : 0xe2e8f0);
+      .setStrokeStyle(kind === 'heavy' ? 6 : 4, this.domain === 'AIR' ? 0xbae6fd : 0xe2e8f0)
+      .setDepth(2);
     if (this.domain === 'AIR') this.shape.setRotation(Math.PI / 4);
 
+    Enemy.ensureCrowdRenderer(scene);
     this.crowdMode = Enemy.crowdModeEnabled && kind !== 'boss';
+    this.shape.setVisible(!this.crowdMode);
     if (!this.crowdMode) this.createDetailVisuals();
 
     Enemy.activeInstances.add(this);
@@ -136,6 +143,7 @@ export class Enemy implements Targetable {
     const next = enabled && this.kind !== 'boss';
     if (this.crowdMode === next) return;
     this.crowdMode = next;
+    this.shape.setVisible(!next);
     if (next) {
       this.destroyDetailVisuals();
     } else {
@@ -225,6 +233,51 @@ export class Enemy implements Targetable {
     this.destroyVisuals();
   }
 
+  private static ensureCrowdRenderer(scene: Phaser.Scene): void {
+    if (Enemy.crowdRendererScene === scene && Enemy.crowdGraphics?.scene) return;
+
+    Enemy.crowdGraphics?.destroy();
+    Enemy.crowdGraphics = scene.add.graphics().setDepth(1);
+    Enemy.crowdRendererScene = scene;
+    Enemy.crowdRenderAccumulatorMs = 0;
+
+    scene.events.on(Phaser.Scenes.Events.POST_UPDATE, Enemy.handleCrowdPostUpdate);
+    scene.events.once(Phaser.Scenes.Events.SHUTDOWN, () => Enemy.releaseScene(scene));
+  }
+
+  private static readonly handleCrowdPostUpdate = (_time: number, delta: number): void => {
+    if (!Enemy.crowdGraphics?.scene) return;
+    Enemy.crowdRenderAccumulatorMs += Math.max(0, delta);
+    if (Enemy.crowdRenderAccumulatorMs < CROWD_RENDER_REFRESH_MS) return;
+    Enemy.crowdRenderAccumulatorMs %= CROWD_RENDER_REFRESH_MS;
+    Enemy.renderCrowd();
+  };
+
+  private static renderCrowd(): void {
+    const graphics = Enemy.crowdGraphics;
+    if (!graphics) return;
+    graphics.clear();
+    if (!Enemy.crowdModeEnabled) return;
+
+    const renderGroup = (kind: 'infantry' | 'heavy' | 'flying', definition: EnemyDefinition): void => {
+      graphics.fillStyle(definition.color, 1);
+      const half = definition.size / 2;
+      for (const enemy of Enemy.activeInstances) {
+        if (!enemy.alive || enemy.kind !== kind) continue;
+        if (kind === 'flying') {
+          graphics.fillTriangle(enemy.x, enemy.y - half, enemy.x + half, enemy.y, enemy.x, enemy.y + half);
+          graphics.fillTriangle(enemy.x, enemy.y - half, enemy.x, enemy.y + half, enemy.x - half, enemy.y);
+        } else {
+          graphics.fillRect(enemy.x - half, enemy.y - half, definition.size, definition.size);
+        }
+      }
+    };
+
+    renderGroup('infantry', INFANTRY);
+    renderGroup('heavy', HEAVY);
+    renderGroup('flying', FLYING);
+  }
+
   private static refreshCrowdMode(): void {
     const count = Enemy.activeInstances.size;
     const next = Enemy.crowdModeEnabled
@@ -233,11 +286,25 @@ export class Enemy implements Targetable {
     if (next === Enemy.crowdModeEnabled) return;
     Enemy.crowdModeEnabled = next;
     for (const enemy of Enemy.activeInstances) enemy.setCrowdMode(next);
+    Enemy.renderCrowd();
   }
 
   private static unregister(enemy: Enemy): void {
     if (!Enemy.activeInstances.delete(enemy)) return;
     Enemy.refreshCrowdMode();
+  }
+
+  private static releaseScene(scene: Phaser.Scene): void {
+    if (Enemy.crowdRendererScene !== scene) return;
+    scene.events.off(Phaser.Scenes.Events.POST_UPDATE, Enemy.handleCrowdPostUpdate);
+    for (const enemy of [...Enemy.activeInstances]) {
+      if (enemy.scene === scene) Enemy.activeInstances.delete(enemy);
+    }
+    Enemy.crowdGraphics?.destroy();
+    Enemy.crowdGraphics = null;
+    Enemy.crowdRendererScene = null;
+    Enemy.crowdRenderAccumulatorMs = 0;
+    Enemy.crowdModeEnabled = Enemy.activeInstances.size >= CROWD_LOD_ENABLE_COUNT;
   }
 
   private getDefinition(kind: EnemyKind): EnemyDefinition {
@@ -266,7 +333,7 @@ export class Enemy implements Targetable {
       stats.size,
       8,
       0x22c55e,
-    ).setOrigin(0.5, 0.5);
+    ).setOrigin(0.5, 0.5).setDepth(3);
 
     const armorLabel = ARMOR_LABELS[this.armorGrade];
     this.armorBadge = armorLabel
@@ -276,7 +343,7 @@ export class Enemy implements Targetable {
         color: this.armorGrade === 'HEAVY' ? '#f8fafc' : '#fde68a',
         backgroundColor: '#020617bb',
         padding: { x: 4, y: 2 },
-      }).setOrigin(0.5)
+      }).setOrigin(0.5).setDepth(3)
       : null;
 
     this.domainBadge = this.domain === 'AIR'
@@ -286,7 +353,7 @@ export class Enemy implements Targetable {
         color: '#7dd3fc',
         backgroundColor: '#082f49cc',
         padding: { x: 5, y: 2 },
-      }).setOrigin(0.5)
+      }).setOrigin(0.5).setDepth(3)
       : null;
   }
 
@@ -326,7 +393,7 @@ export class Enemy implements Targetable {
         color: '#fef3c7',
         backgroundColor: '#020617bb',
         padding: { x: 3, y: 1 },
-      }).setOrigin(0.5);
+      }).setOrigin(0.5).setDepth(3);
     }
 
     this.statusBadge.setText(label).setVisible(true);
