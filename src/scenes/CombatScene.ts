@@ -86,6 +86,8 @@ export class CombatScene extends Phaser.Scene {
   private globalDamageLevel = 0;
   private globalAttackSpeedLevel = 0;
   private baseHpUpgradeLevel = 0;
+  private baseDamageReductionLevel = 0;
+  private xpGainLevel = 0;
 
   private currentShopWave: number | null = null;
   private shopItems: BossShopItem[] = [];
@@ -137,6 +139,8 @@ export class CombatScene extends Phaser.Scene {
     this.globalDamageLevel = 0;
     this.globalAttackSpeedLevel = 0;
     this.baseHpUpgradeLevel = 0;
+    this.baseDamageReductionLevel = 0;
+    this.xpGainLevel = 0;
     this.currentShopWave = null;
     this.shopItems = [];
     this.purchasedShopIds.clear();
@@ -281,12 +285,22 @@ export class CombatScene extends Phaser.Scene {
     const options = this.upgradeDirector.generate({
       runLevel: this.runState.level,
       currentWave: this.waveManager.wave,
-      ownedWeapons: this.weapons.map((weapon) => ({ id: weapon.id, name: weapon.name, level: weapon.level })),
+      ownedWeapons: this.weapons.map((weapon) => ({
+        id: weapon.id,
+        name: weapon.name,
+        level: weapon.level,
+        currentHp: weapon.currentHp,
+        maxHp: weapon.maxHp,
+      })),
       ownedRandomWeaponIds: [...this.randomWeapons.keys()],
       activeComboIds: [...this.activeCombos],
       globalDamageLevel: this.globalDamageLevel,
       globalAttackSpeedLevel: this.globalAttackSpeedLevel,
       baseHpUpgradeLevel: this.baseHpUpgradeLevel,
+      baseDamageReductionLevel: this.baseDamageReductionLevel,
+      xpGainLevel: this.xpGainLevel,
+      baseCurrentHp: this.base.currentHp,
+      baseMaxHp: this.base.maxHp,
     });
     this.upgradeOverlay.show(options, this.runState.getSkipReward(), this.runState.rerollCharges);
   }
@@ -341,6 +355,12 @@ export class CombatScene extends Phaser.Scene {
       case 'weapon-level':
         if (option.weaponId) this.weapons.find((candidate) => candidate.id === option.weaponId)?.upgradeLevel();
         break;
+      case 'weapon-repair':
+        if (option.weaponId) {
+          const weapon = this.weapons.find((candidate) => candidate.id === option.weaponId);
+          if (weapon) weapon.repair(weapon.maxHp * 0.35);
+        }
+        break;
       case 'combo':
         if (option.comboId) {
           this.activeCombos.add(option.comboId);
@@ -360,6 +380,20 @@ export class CombatScene extends Phaser.Scene {
       case 'base-max-hp':
         this.baseHpUpgradeLevel += 1;
         this.base.increaseMaxHp(1.12);
+        break;
+      case 'base-damage-reduction':
+        this.baseDamageReductionLevel += 1;
+        this.base.addDamageReduction(0.05);
+        break;
+      case 'xp-gain':
+        this.xpGainLevel += 1;
+        this.runState.increaseXpGain(1.08);
+        break;
+      case 'reroll-charge':
+        this.runState.addRerollCharges(1);
+        break;
+      case 'base-heal':
+        this.base.healFraction(0.25);
         break;
     }
   }
@@ -646,9 +680,9 @@ export class CombatScene extends Phaser.Scene {
 
     this.waveText.setText(`Difficulty ${difficulty.label} · Wave ${this.waveManager.wave}${waveKind}`);
     this.enemyText.setText(`Enemies ${this.enemies.length}${heavyCount > 0 ? ` · Heavy ${heavyCount}` : ''}${airCount > 0 ? ` · Air ${airCount}` : ''}`);
-    this.runText.setText(`Run Lv ${this.runState.level}  EXP ${this.runState.xp}/${this.runState.xpToNextLevel}`);
+    this.runText.setText(`Run Lv ${this.runState.level}  EXP ${this.runState.xp}/${this.runState.xpToNextLevel} · XP ${this.runState.xpGainMultiplier.toFixed(2)}x`);
     this.creditsText.setText(`Credits ${this.runState.credits} · Reroll ${this.runState.rerollCharges}`);
-    this.baseText.setText(`Base HP ${Math.ceil(this.base.currentHp)} / ${this.base.maxHp}`);
+    this.baseText.setText(`Base HP ${Math.ceil(this.base.currentHp)} / ${this.base.maxHp} · DR ${Math.round(this.base.damageReduction * 100)}%`);
     this.weaponText.setText(this.weapons.map((weapon, index) => (
       `S${index + 1} ${weapon.progressionLabel} · HP ${Math.ceil(weapon.currentHp)}/${weapon.maxHp} · Ammo ${weapon.ammoLabel} · ${weapon.currentState}`
     )));
