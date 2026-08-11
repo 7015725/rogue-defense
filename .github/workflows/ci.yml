@@ -54,8 +54,17 @@ jobs:
           EXIT_CODE=${PIPESTATUS[0]}
           echo "exit_code=$EXIT_CODE" >> "$GITHUB_OUTPUT"
           if [ "$EXIT_CODE" -ne 0 ]; then
-            ERROR_LINE=$(grep -E 'Error:|failed|Timeout|expect\(' smoke.log | tail -n 1 | tr -d '\r\n' | cut -c1-180)
-            if [ -z "$ERROR_LINE" ]; then ERROR_LINE=$(tail -n 1 smoke.log | tr -d '\r\n' | cut -c1-180); fi
+            TEST_LINE=$(grep -E '^[[:space:]]*[0-9]+\)' smoke.log | head -n 1 | tr -d '\r\n' | cut -c1-150)
+            DETAIL_LINE=$(grep -E 'Error:|Expected:|Received:|Timeout|pageerror:|console:' smoke.log | head -n 1 | tr -d '\r\n' | cut -c1-150)
+            if [ -n "$TEST_LINE" ] && [ -n "$DETAIL_LINE" ]; then
+              ERROR_LINE="$TEST_LINE :: $DETAIL_LINE"
+            elif [ -n "$TEST_LINE" ]; then
+              ERROR_LINE="$TEST_LINE"
+            elif [ -n "$DETAIL_LINE" ]; then
+              ERROR_LINE="$DETAIL_LINE"
+            else
+              ERROR_LINE=$(tail -n 3 smoke.log | tr '\n' ' ' | tr -d '\r' | cut -c1-180)
+            fi
             echo "error_line=$ERROR_LINE" >> "$GITHUB_OUTPUT"
           fi
           exit 0
