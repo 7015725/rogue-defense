@@ -182,7 +182,7 @@ export class Enemy implements Targetable {
       this.shape.y = ENEMY_SPAWN_Y + (BASE_ATTACK_Y - ENEMY_SPAWN_Y) * nextProgress;
       this.shape.x = this.domain === 'AIR'
         ? this.getAirPathX(nextProgress)
-        : Phaser.Math.Linear(this.spawnX, BASE_X, Math.pow(nextProgress, 1.35));
+        : this.spawnX;
       if (!this.crowdMode) this.syncDecorations();
       return;
     }
@@ -323,9 +323,8 @@ export class Enemy implements Targetable {
   }
 
   private getAirPathX(progress: number): number {
-    const centerPull = Phaser.Math.Linear(this.spawnX, BASE_X, Math.pow(progress, 1.05));
     const sway = Math.sin(progress * Math.PI * 3 + this.airPhase) * 95 * (1 - progress * 0.7);
-    return centerPull + sway;
+    return this.spawnX + sway;
   }
 
   private createDetailVisuals(): void {
