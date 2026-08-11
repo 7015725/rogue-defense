@@ -21,6 +21,7 @@ import type {
   TargetDomain,
 } from '../combat/types';
 import { StatusEffectSystem } from '../systems/StatusEffectSystem';
+import { WaveDirector } from '../systems/WaveDirector';
 import type { Base } from './Base';
 
 export interface EnemyRewards {
@@ -74,13 +75,17 @@ export class Enemy implements Targetable {
     difficultyScale: EnemyDifficultyScale = { hpMultiplier: 1, damageMultiplier: 1 },
   ) {
     const stats = this.getDefinition(kind);
-    this.maxHpValue = Math.max(1, Math.round(stats.hp * Math.max(0.01, difficultyScale.hpMultiplier)));
+    const waveScale = WaveDirector.getActiveSpawnScaling();
+    const hpMultiplier = Math.max(0.01, difficultyScale.hpMultiplier) * waveScale.hpMultiplier;
+    const damageMultiplier = Math.max(0.01, difficultyScale.damageMultiplier) * waveScale.damageMultiplier;
+
+    this.maxHpValue = Math.max(1, Math.round(stats.hp * hpMultiplier));
     this.hp = this.maxHpValue;
     this.baseArmor = stats.armor;
     this.armorGrade = stats.armorGrade;
     this.domain = stats.domain;
     this.moveSpeed = stats.moveSpeed;
-    this.attackDamage = stats.attackDamage * Math.max(0.01, difficultyScale.damageMultiplier);
+    this.attackDamage = stats.attackDamage * damageMultiplier;
     this.attackIntervalMs = stats.attackIntervalMs;
     this.rewards = { xp: stats.xp, credits: stats.credits };
     this.statusEffects = new StatusEffectSystem(kind === 'boss', (amount) => this.takeDamage(amount));
