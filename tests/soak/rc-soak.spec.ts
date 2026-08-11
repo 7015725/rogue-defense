@@ -4,14 +4,6 @@ import { expect, test, type Page } from '@playwright/test';
 const LOGICAL_WIDTH = 1000;
 const LOGICAL_HEIGHT = 1600;
 
-interface CombatSnapshot {
-  scene: string;
-  wave: number;
-  runLevel: number;
-  overlay: 'none' | 'upgrade' | 'branch' | 'shop' | 'replacement';
-  optionIds: string[];
-}
-
 async function clickLogical(page: Page, x: number, y: number): Promise<void> {
   const canvas = page.locator('canvas');
   await expect(canvas).toBeVisible();
@@ -52,53 +44,52 @@ async function installMaxMetaSave(page: Page): Promise<void> {
   });
 }
 
-function preferredUpgradeIndex(optionIds: string[]): number {
-  const priorities = [
-    'unlock:lmg', 'unlock:sniper', 'global-damage', 'global-attack-speed',
-    'unlock:auto-gl', 'unlock:tesla', 'unlock:shotgun',
-    'weapon-level:lmg', 'weapon-level:sniper', 'weapon-level:auto-cannon',
-    'weapon-level:auto-gl', 'weapon-level:tesla', 'weapon-level:shotgun',
-    'combo:OVERLOAD', 'combo:CONTROL_EXECUTION', 'combo:DETONATION',
-    'combo:CONCUSSIVE_BREAK', 'base-max-hp',
-  ];
-  for (const id of priorities) {
-    const index = optionIds.indexOf(id);
-    if (index >= 0) return index;
-  }
-  return 0;
-}
+const UPGRADE_PRIORITIES = [
+  'unlock:lmg', 'unlock:sniper', 'global-damage', 'global-attack-speed',
+  'unlock:auto-gl', 'unlock:tesla', 'unlock:shotgun',
+  'weapon-level:lmg', 'weapon-level:sniper', 'weapon-level:auto-cannon',
+  'weapon-level:auto-gl', 'weapon-level:tesla', 'weapon-level:shotgun',
+  'combo:OVERLOAD', 'combo:CONTROL_EXECUTION', 'combo:DETONATION',
+  'combo:CONCUSSIVE_BREAK', 'base-max-hp',
+] as const;
 
-async function configureFunctionalSoak(page: Page): Promise<void> {
-  await page.evaluate(() => {
-    const game = (window as unknown as { __rogueDefenseGame?: { scene: { getScene: (key: string) => unknown } } }).__rogueDefenseGame;
-    const combat = game?.scene.getScene('CombatScene') as {
-      maxGameSpeed?: number;
-      gameSpeed?: number;
-      globalDamageMultiplier?: number;
-      base?: { increaseMaxHp: (multiplier: number) => void };
-      refreshWeaponModifiers?: () => void;
-    } | undefined;
-    if (!combat) throw new Error('DEV Phaser game probe unavailable');
-    combat.maxGameSpeed = 16;
-    combat.gameSpeed = 16;
-    combat.globalDamageMultiplier = (combat.globalDamageMultiplier ?? 1) * 200;
-    combat.base?.increaseMaxHp(100);
-    combat.refreshWeaponModifiers?.();
-  });
-}
+test('DEV functional W1 soak reaches W101 and verifies Difficulty II settlement chain', async ({ page }) => {
+  test.setTimeout(60_000);
+  await page.setViewportSize({ width: 1000, height: 1600 });
+  await page.goto('/?dev=1');
+  await installMaxMetaSave(page);
+  await page.reload();
 
-async function advanceCombat(page: Page, stepCount = 500): Promise<CombatSnapshot> {
-  return page.evaluate((steps) => {
-    type Overlay = { visible: boolean };
-    type UpgradeOverlayProbe = Overlay & { optionIds: readonly string[] };
+  const app = page.locator('#app');
+  await expect(app).toHaveAttribute('data-scene', 'menu');
+  await clickLogical(page, 500, 675);
+  await expect(app).toHaveAttribute('data-scene', 'combat');
+  await expect(app).toHaveAttribute('data-dev-run', '0');
+
+  const result = await page.evaluate((priorities) => {
+    type UpgradeOverlayProbe = {
+      visible: boolean;
+      optionIds: readonly string[];
+      selectIndex: (index: number) => boolean;
+    };
+    type BranchOverlayProbe = { visible: boolean; selectIndex: (index: number) => boolean };
+    type OverlayProbe = { visible: boolean };
     type CombatProbe = {
       update: (time: number, delta: number) => void;
+      finishRun: (reason: 'VOLUNTARY_EXIT') => void;
+      handleLeaveShop: () => void;
+      handleReplacementSelection: (weaponId: string | null) => void;
       waveManager: { wave: number };
       runState: { level: number };
       upgradeOverlay: UpgradeOverlayProbe;
-      branchOverlay: Overlay;
-      bossShopOverlay: Overlay;
-      replacementOverlay: Overlay;
+      branchOverlay: BranchOverlayProbe;
+      bossShopOverlay: OverlayProbe;
+      replacementOverlay: OverlayProbe;
+      maxGameSpeed: number;
+      gameSpeed: number;
+      globalDamageMultiplier: number;
+      base: { increaseMaxHp: (multiplier: number) => void };
+      refreshWeaponModifiers: () => void;
     };
     const game = (window as unknown as {
       __rogueDefenseGame?: {
@@ -111,85 +102,70 @@ async function advanceCombat(page: Page, stepCount = 500): Promise<CombatSnapsho
     if (!game) throw new Error('DEV Phaser game probe unavailable');
     const combat = game.scene.getScene('CombatScene') as CombatProbe;
 
-    const getOverlay = (): CombatSnapshot['overlay'] => combat.replacementOverlay.visible
-      ? 'replacement'
-      : combat.branchOverlay.visible
-        ? 'branch'
-        : combat.bossShopOverlay.visible
-          ? 'shop'
-          : combat.upgradeOverlay.visible
-            ? 'upgrade'
-            : 'none';
+    combat.maxGameSpeed = 16;
+    combat.gameSpeed = 16;
+    combat.globalDamageMultiplier *= 200;
+    combat.base.increaseMaxHp(100);
+    combat.refreshWeaponModifiers();
 
-    for (let index = 0; index < steps; index += 1) {
+    let updates = 0;
+    let upgrades = 0;
+    let branches = 0;
+    let shops = 0;
+
+    while (updates < 20_000) {
       const active = game.scene.getScenes(true)[0];
       if (!active || active.scene.key !== 'CombatScene') break;
-      if (getOverlay() !== 'none') break;
+      if (combat.waveManager.wave >= 101) break;
+
+      if (combat.upgradeOverlay.visible) {
+        const ids = [...combat.upgradeOverlay.optionIds];
+        let chosen = 0;
+        for (const id of priorities) {
+          const index = ids.indexOf(id);
+          if (index >= 0) {
+            chosen = index;
+            break;
+          }
+        }
+        if (!combat.upgradeOverlay.selectIndex(chosen)) throw new Error('Unable to resolve upgrade overlay');
+        upgrades += 1;
+        continue;
+      }
+      if (combat.branchOverlay.visible) {
+        if (!combat.branchOverlay.selectIndex(0)) throw new Error('Unable to resolve branch overlay');
+        branches += 1;
+        continue;
+      }
+      if (combat.replacementOverlay.visible) {
+        combat.handleReplacementSelection(null);
+        continue;
+      }
+      if (combat.bossShopOverlay.visible) {
+        combat.handleLeaveShop();
+        shops += 1;
+        continue;
+      }
+
       combat.update(performance.now(), 50);
+      updates += 1;
     }
 
-    const active = game.scene.getScenes(true)[0];
-    return {
-      scene: active?.scene.key ?? 'none',
-      wave: combat.waveManager?.wave ?? 0,
-      runLevel: combat.runState?.level ?? 0,
-      overlay: active?.scene.key === 'CombatScene' ? getOverlay() : 'none',
-      optionIds: [...(combat.upgradeOverlay?.optionIds ?? [])],
-    };
-  }, stepCount);
-}
+    const wave = combat.waveManager.wave;
+    const runLevel = combat.runState.level;
+    const activeKey = game.scene.getScenes(true)[0]?.scene.key ?? 'none';
+    if (activeKey === 'CombatScene' && wave >= 101) combat.finishRun('VOLUNTARY_EXIT');
+    return { wave, runLevel, activeKey, updates, upgrades, branches, shops };
+  }, UPGRADE_PRIORITIES);
 
-async function resolveOverlay(page: Page, snapshot: CombatSnapshot): Promise<void> {
-  if (snapshot.overlay === 'upgrade') {
-    const index = preferredUpgradeIndex(snapshot.optionIds);
-    await clickLogical(page, 500, 470 + index * 250);
-    return;
-  }
-  if (snapshot.overlay === 'branch') {
-    await clickLogical(page, 500, 500);
-    return;
-  }
-  if (snapshot.overlay === 'replacement') {
-    await clickLogical(page, 500, 1345);
-    return;
-  }
-  if (snapshot.overlay === 'shop') {
-    await clickLogical(page, 735, 1405);
-  }
-}
+  expect(result.activeKey, `Functional soak left combat at W${result.wave}`).toBe('CombatScene');
+  expect(result.wave, `Functional soak stopped after ${result.updates} updates`).toBeGreaterThanOrEqual(101);
+  expect(result.shops).toBeGreaterThanOrEqual(10);
+  expect(result.upgrades).toBeGreaterThan(20);
+  expect(result.runLevel).toBeGreaterThanOrEqual(45);
+  expect(result.runLevel).toBeLessThanOrEqual(80);
 
-test('DEV functional W1 soak reaches W101 and verifies Difficulty II settlement chain', async ({ page }) => {
-  test.setTimeout(90_000);
-  await page.setViewportSize({ width: 1000, height: 1600 });
-  await page.goto('/?dev=1');
-  await installMaxMetaSave(page);
-  await page.reload();
-
-  const app = page.locator('#app');
-  await expect(app).toHaveAttribute('data-scene', 'menu');
-  await clickLogical(page, 500, 675);
-  await expect(app).toHaveAttribute('data-scene', 'combat');
-  await expect(app).toHaveAttribute('data-dev-run', '0');
-  await configureFunctionalSoak(page);
-
-  let snapshot = await advanceCombat(page, 1);
-  for (let cycle = 0; cycle < 300 && snapshot.scene === 'CombatScene' && snapshot.wave < 101; cycle += 1) {
-    if (snapshot.overlay !== 'none') {
-      await resolveOverlay(page, snapshot);
-      snapshot = await advanceCombat(page, 1);
-      continue;
-    }
-    snapshot = await advanceCombat(page, 500);
-  }
-
-  expect(snapshot.scene, `Functional soak left combat at W${snapshot.wave}`).toBe('CombatScene');
-  expect(snapshot.wave, 'Functional soak ended before W101').toBeGreaterThanOrEqual(101);
-  expect(snapshot.runLevel).toBeGreaterThanOrEqual(45);
-  expect(snapshot.runLevel).toBeLessThanOrEqual(80);
-
-  await clickLogical(page, 870, 330);
   await expect(app).toHaveAttribute('data-scene', 'settlement');
-
   const save = await page.evaluate(() => JSON.parse(localStorage.getItem('rogue-defense.save') ?? '{}')) as {
     maxDifficultyUnlocked?: number;
     highWaveByDifficulty?: number[];
