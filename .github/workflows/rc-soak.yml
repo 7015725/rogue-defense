@@ -19,6 +19,21 @@ jobs:
     timeout-minutes: 8
     steps:
       - uses: actions/checkout@v6
+
+      - name: Publish soak pending status
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPO: ${{ github.repository }}
+          SHA: ${{ github.sha }}
+        run: |
+          curl --fail-with-body -sS -L \
+            -X POST \
+            -H "Accept: application/vnd.github+json" \
+            -H "Authorization: Bearer $GH_TOKEN" \
+            -H "X-GitHub-Api-Version: 2022-11-28" \
+            "https://api.github.com/repos/$REPO/statuses/$SHA" \
+            -d '{"state":"pending","context":"ci/soak","description":"RC checkpoint functional + Stress300 queued"}'
+
       - uses: actions/setup-node@v6
         with:
           node-version: '22'
@@ -28,26 +43,40 @@ jobs:
         run: |
           npm install --no-save --no-audit --no-fund @playwright/test@1.62.1
           npx playwright install --with-deps chromium
-      - name: Accelerated long-run and Stress300 baseline
-        id: soak
+
+      - name: Checkpoint functional soak
+        id: functional
         shell: bash
         run: |
           set +e
-          npm run soak 2>&1 | tee soak.log
+          npm run soak -- --grep "RC checkpoint soak" 2>&1 | tee functional.log
           EXIT_CODE=${PIPESTATUS[0]}
           echo "exit_code=$EXIT_CODE" >> "$GITHUB_OUTPUT"
-          PERF_LINE=$(grep 'RC_PERF ' soak.log | tail -n 1 | sed 's/^.*RC_PERF //' | tr -d '\r\n' | cut -c1-180)
-          if [ -n "$PERF_LINE" ]; then echo "perf_line=$PERF_LINE" >> "$GITHUB_OUTPUT"; fi
           if [ "$EXIT_CODE" -ne 0 ]; then
-            TEST_LINE=$(grep -E '^[[:space:]]*[0-9]+\)' soak.log | head -n 1 | tr -d '\r\n' | cut -c1-150)
-            DETAIL_LINE=$(grep -E 'Error:|Expected:|Received:|Timeout|Autoplay run ended|toBeGreaterThan' soak.log | head -n 1 | tr -d '\r\n' | cut -c1-150)
-            if [ -n "$TEST_LINE" ] && [ -n "$DETAIL_LINE" ]; then ERROR_LINE="$TEST_LINE :: $DETAIL_LINE";
-            elif [ -n "$TEST_LINE" ]; then ERROR_LINE="$TEST_LINE";
-            elif [ -n "$DETAIL_LINE" ]; then ERROR_LINE="$DETAIL_LINE";
-            else ERROR_LINE=$(tail -n 3 soak.log | tr '\n' ' ' | tr -d '\r' | cut -c1-180); fi
+            ERROR_LINE=$(grep -E 'Error:|Expected:|Received:|Timeout|Boss Shop|Functional' functional.log | head -n 1 | tr -d '\r\n' | cut -c1-180)
+            if [ -z "$ERROR_LINE" ]; then ERROR_LINE=$(tail -n 3 functional.log | tr '\n' ' ' | tr -d '\r' | cut -c1-180); fi
             echo "error_line=$ERROR_LINE" >> "$GITHUB_OUTPUT"
           fi
           exit 0
+
+      - name: Stress300 performance baseline
+        if: steps.functional.outputs.exit_code == '0'
+        id: perf
+        shell: bash
+        run: |
+          set +e
+          npm run soak -- --grep "Stress300 automated" 2>&1 | tee perf.log
+          EXIT_CODE=${PIPESTATUS[0]}
+          echo "exit_code=$EXIT_CODE" >> "$GITHUB_OUTPUT"
+          PERF_LINE=$(grep 'RC_PERF ' perf.log | tail -n 1 | sed 's/^.*RC_PERF //' | tr -d '\r\n' | cut -c1-180)
+          if [ -n "$PERF_LINE" ]; then echo "perf_line=$PERF_LINE" >> "$GITHUB_OUTPUT"; fi
+          if [ "$EXIT_CODE" -ne 0 ]; then
+            ERROR_LINE=$(grep -E 'Error:|Expected:|Received:|Timeout|toBeGreaterThan' perf.log | head -n 1 | tr -d '\r\n' | cut -c1-180)
+            if [ -z "$ERROR_LINE" ]; then ERROR_LINE=$(tail -n 3 perf.log | tr '\n' ' ' | tr -d '\r' | cut -c1-180); fi
+            echo "error_line=$ERROR_LINE" >> "$GITHUB_OUTPUT"
+          fi
+          exit 0
+
       - name: Upload playtest metrics
         if: always()
         uses: actions/upload-artifact@v7
@@ -56,41 +85,61 @@ jobs:
           path: test-results/rc-perf.json
           if-no-files-found: warn
           retention-days: 14
-      - name: Publish soak status
+
+      - name: Publish soak results
         if: always()
         env:
           GH_TOKEN: ${{ github.token }}
           REPO: ${{ github.repository }}
           SHA: ${{ github.sha }}
-          SOAK_EXIT: ${{ steps.soak.outputs.exit_code }}
-          SOAK_ERROR: ${{ steps.soak.outputs.error_line }}
-          PERF_LINE: ${{ steps.soak.outputs.perf_line }}
+          FUNCTIONAL_EXIT: ${{ steps.functional.outputs.exit_code }}
+          FUNCTIONAL_ERROR: ${{ steps.functional.outputs.error_line }}
+          PERF_EXIT: ${{ steps.perf.outputs.exit_code }}
+          PERF_ERROR: ${{ steps.perf.outputs.error_line }}
+          PERF_LINE: ${{ steps.perf.outputs.perf_line }}
         run: |
-          if [ "$SOAK_EXIT" = "0" ]; then
-            STATE=success
-            DESC="Accelerated W1-W101 soak + Stress300 passed"
-            if [ -n "$PERF_LINE" ]; then DESC=$(printf 'Soak passed; perf %s' "$PERF_LINE" | cut -c1-140); fi
-          else
-            STATE=failure
-            DESC="RC soak or Stress300 baseline failed"
-          fi
-          curl --fail-with-body -sS -L \
-            -X POST \
-            -H "Accept: application/vnd.github+json" \
-            -H "Authorization: Bearer $GH_TOKEN" \
-            -H "X-GitHub-Api-Version: 2022-11-28" \
-            "https://api.github.com/repos/$REPO/statuses/$SHA" \
-            -d "{\"state\":\"$STATE\",\"context\":\"ci/soak\",\"description\":\"$DESC\"}"
-          if [ "$SOAK_EXIT" != "0" ] && [ -n "$SOAK_ERROR" ]; then
-            SAFE=$(printf '%s' "$SOAK_ERROR" | sed 's/[^A-Za-z0-9_.:()\/ -]/_/g' | cut -c1-180)
+          publish_status() {
+            local state="$1"
+            local context="$2"
+            local description="$3"
             curl --fail-with-body -sS -L \
               -X POST \
               -H "Accept: application/vnd.github+json" \
               -H "Authorization: Bearer $GH_TOKEN" \
               -H "X-GitHub-Api-Version: 2022-11-28" \
               "https://api.github.com/repos/$REPO/statuses/$SHA" \
-              -d "{\"state\":\"failure\",\"context\":\"ci/soak-error: $SAFE\",\"description\":\"RC soak failure summary\"}"
+              -d "{\"state\":\"$state\",\"context\":\"$context\",\"description\":\"$description\"}"
+          }
+
+          if [ "$FUNCTIONAL_EXIT" = "0" ]; then
+            publish_status success "ci/soak-functional" "W10-W100 checkpoint chain + W101 unlock passed"
+          else
+            publish_status failure "ci/soak-functional" "Checkpoint functional soak failed"
           fi
+
+          if [ "$PERF_EXIT" = "0" ]; then
+            DESC="Stress300 W1/W50/W100 Chromium baseline passed"
+            if [ -n "$PERF_LINE" ]; then DESC=$(printf 'Perf %s' "$PERF_LINE" | cut -c1-140); fi
+            publish_status success "ci/perf" "$DESC"
+          elif [ "$FUNCTIONAL_EXIT" = "0" ]; then
+            publish_status failure "ci/perf" "Stress300 Chromium baseline failed"
+          else
+            publish_status error "ci/perf" "Skipped because checkpoint soak failed"
+          fi
+
+          if [ "$FUNCTIONAL_EXIT" = "0" ] && [ "$PERF_EXIT" = "0" ]; then
+            publish_status success "ci/soak" "RC checkpoint functional + Stress300 passed"
+          else
+            publish_status failure "ci/soak" "RC soak validation failed"
+          fi
+
+          ERROR_LINE="$FUNCTIONAL_ERROR"
+          if [ -z "$ERROR_LINE" ]; then ERROR_LINE="$PERF_ERROR"; fi
+          if [ -n "$ERROR_LINE" ]; then
+            SAFE=$(printf '%s' "$ERROR_LINE" | sed 's/[^A-Za-z0-9_.:()\/ -]/_/g' | cut -c1-180)
+            publish_status failure "ci/soak-error: $SAFE" "RC soak failure summary"
+          fi
+
       - name: Fail workflow when soak failed
-        if: steps.soak.outputs.exit_code != '0'
+        if: steps.functional.outputs.exit_code != '0' || steps.perf.outputs.exit_code != '0'
         run: exit 1
