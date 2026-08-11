@@ -82,4 +82,20 @@
 - Combo 从 Run Lv8+ 开始进入候选池，并根据已拥有武器做基本前置过滤；已获得 Combo 移出本局候选池。
 - M0.4 中龙息、温压、烟幕、冲击波的占位路线文案已同步改为当前真实 Status 效果。
 
-完整细节见 `game-design-v0.2.md`、`m0.6-design.md`、`m0.7-design.md`。
+## 2026-08-11 — M0.8 Boss Shop
+
+- Boss Gate 正式变成阶段结算节点：Boss 死亡后清残怪、完全暂停、打开 Boss Shop，只有显式离店后 Wave 才继续。
+- 当前测试范围扩展到 Wave 30；Wave 10 / 20 / 30 都打开 Boss Shop，Wave 30 离店后结束 M0.8 测试。
+- Boss Shop 固定 5 格，Slot 1 为付费后勤位（Base Heal 或 Weapon Repair），其余 4 格从合法商品池生成，完全相同商品 ID 不同屏重复。
+- 商店商品包含：Base Heal、Weapon Repair、全局伤害、全局攻速、Base MaxHP、已有武器 +1 Lv、新武器/替换、Combo Mechanism、Reroll Charge。
+- W10 基础价格随 Checkpoint 轻度上涨：W20 ×1.15、W30 ×1.30；刷新价格每个商店独立使用 60 / 120 / 240 / 480…。
+- RunState 正式增加可消费 Credits API 与 Reroll Charges；Level Up Overlay 可以消耗 Charge 重新生成三选一，不消耗 Pending Upgrade。
+- 武器正式获得 MaxHP / CurrentHP / Disabled / AutoRepair / Repair API。HP=0 后停火并自修，恢复至 25% MaxHP 后重新上线；Boss Shop Repair 直接满修。
+- M0.8 暂未加入会主动攻击武器的 Engineer/Bomber，耐久系统先作为后续敌人技能接口。
+- 满 4 个随机武器槽后，Boss Shop 仍可出售未拥有武器；购买先进入 Replacement Overlay，取消不扣钱，确认后才替换。
+- Auto Cannon 永不可替换；随机武器替换会 destroy 旧实例并复用原槽位置，旧 Lv5/Lv10 路线丢失。
+- 替换等级补偿：W10 Lv2、W20 Lv4、W30 Lv6；补偿跨过 Lv5/Lv10 时立即触发对应免费路线选择。
+- 新武器和替换武器即时继承当前 Global Modifiers 与 Active Combos。
+- Wave 21～29 开始在常规敌潮中混入 Flying；Wave 30 Boss 使用 8 架 Recon Drone 护航。
+
+完整细节见 `game-design-v0.2.md`、`m0.7-design.md`、`m0.8-design.md`。
