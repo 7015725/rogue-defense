@@ -115,7 +115,7 @@ export const AUTO_CANNON: WeaponDefinition = {
   targetDomains: ['GROUND', 'AIR'],
   damage: 18,
   attackIntervalMs: 500,
-  range: 720,
+  range: Number.POSITIVE_INFINITY,
   projectileSpeed: 900,
   magazineSize: 12,
   reloadTimeMs: 1600,
