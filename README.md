@@ -30,11 +30,12 @@ M0.1～M0.9 的主要系统、Endless Wave、W100 解锁链、DEV Playtest/Stres
 - DEV Stress 300，DEV Settlement 不写永久 Save；
 - Projectile Pool / Status Text / HUD 高频路径优化；
 - >=180 Active Enemy 自动进入 Crowd LOD，普通敌人主体合批渲染；
+- 无 Status Enemy 快速路径；ProjectilePool 仅更新 Active Projectile；
 - Safe Area / `100dvh` / Touch 移动端适配；
 - PWA Manifest + Service Worker + App Icon；
 - Chromium Production Browser Smoke Gate；
 - RC Checkpoint Functional Soak；
-- CI Stress300 性能 Gate；
+- CI Fixed-Stress300 性能 Gate；
 - CI 自动生成验证后的 Web RC Artifact。
 
 Wave100 是 Difficulty 解锁里程碑，**不是单局结束点**。
@@ -133,7 +134,7 @@ TypeScript strict
 
 RC Soak:
 Checkpoint Functional
-→ Stress300 Performance
+→ Fixed Stress300 Performance
 ```
 
 Commit Status：
@@ -147,15 +148,15 @@ ci/perf
 ci/soak
 ```
 
-当前 Stress300 CI Chromium 基线：
+当前 Fixed Stress300 CI Chromium 稳定基线：
 
 ```text
-W1      18.37 FPS
-W50     16.07 FPS
-W100    25.72 FPS
+W1      20 FPS
+W50     20 FPS
+W100    20 FPS
 ```
 
-最低自动 Gate 为 15 FPS。该结果只代表 CI Chromium 基线；真机 4×、温度、触控与长时间内存仍需要设备验证。
+每档独立采样 3 次并取中位数，最低自动 Gate 保持 15 FPS。该结果只代表 CI Chromium 稳定帧率基线；真机 4×、温度、触控与长时间内存仍需要设备验证。
 
 通过后 CI 上传：
 
