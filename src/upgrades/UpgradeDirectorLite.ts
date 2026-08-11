@@ -139,6 +139,10 @@ export class UpgradeDirectorLite {
       .map((weapon) => {
         const milestoneBoost = weapon.level === 4 || weapon.level === 9 ? 1.15 : 1;
         const nextLevel = weapon.level + 1;
+        const damageBefore = 1 + 0.12 * (weapon.level - 1);
+        const damageAfter = 1 + 0.12 * weapon.level;
+        const attackSpeedBefore = 1 + 0.04 * (weapon.level - 1);
+        const attackSpeedAfter = 1 + 0.04 * weapon.level;
         const milestone = nextLevel === 5
           ? '\n达到 Lv5 后立即选择 α / β / γ 路线'
           : nextLevel === 10
@@ -149,7 +153,11 @@ export class UpgradeDirectorLite {
           id: `weapon-level:${weapon.id}`,
           kind: 'weapon-level' as const,
           title: `${weapon.name} +1 Lv`,
-          description: `Lv${weapon.level} → Lv${nextLevel}${milestone}`,
+          description: [
+            `Lv${weapon.level} → Lv${nextLevel}`,
+            `伤害系数 ${damageBefore.toFixed(2)}× → ${damageAfter.toFixed(2)}×`,
+            `攻速系数 ${attackSpeedBefore.toFixed(2)}× → ${attackSpeedAfter.toFixed(2)}×${milestone}`,
+          ].join('\n'),
           rarity: 'COMMON' as const,
           weight: 12 * milestoneBoost,
           weaponId: weapon.id,
