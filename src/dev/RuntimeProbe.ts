@@ -6,6 +6,11 @@ export interface RuntimeProbeState {
   devRun?: boolean;
   stressCount?: number;
   startWave?: number;
+  overlay?: 'none' | 'upgrade' | 'branch' | 'shop' | 'replacement';
+  upgradeOptionIds?: readonly string[];
+  runLevel?: number;
+  credits?: number;
+  fps?: number;
 }
 
 export function isRuntimeProbeEnabled(): boolean {
@@ -28,6 +33,11 @@ export function publishRuntimeProbe(state: RuntimeProbeState): void {
   if (state.devRun !== undefined) next.devRun = state.devRun ? '1' : '0';
   if (state.stressCount !== undefined) next.stressCount = String(state.stressCount);
   if (state.startWave !== undefined) next.startWave = String(state.startWave);
+  if (state.overlay !== undefined) next.overlay = state.overlay;
+  if (state.upgradeOptionIds !== undefined) next.upgradeOptionIds = state.upgradeOptionIds.join('|');
+  if (state.runLevel !== undefined) next.runLevel = String(state.runLevel);
+  if (state.credits !== undefined) next.credits = String(state.credits);
+  if (state.fps !== undefined) next.fps = String(Math.round(state.fps));
 
   for (const key of Object.keys(app.dataset)) {
     if (!(key in next)) delete app.dataset[key];
