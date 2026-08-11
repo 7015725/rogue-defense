@@ -4,12 +4,14 @@ export class RunState {
   private creditsValue = 0;
   private pendingUpgradesValue = 0;
   private rerollChargesValue = 0;
+  private xpGainMultiplierValue = 1;
 
   get level(): number { return this.levelValue; }
   get xp(): number { return this.xpValue; }
   get credits(): number { return this.creditsValue; }
   get pendingUpgrades(): number { return this.pendingUpgradesValue; }
   get rerollCharges(): number { return this.rerollChargesValue; }
+  get xpGainMultiplier(): number { return this.xpGainMultiplierValue; }
 
   get xpToNextLevel(): number {
     return 45 + 15 * (this.levelValue - 1);
@@ -17,7 +19,7 @@ export class RunState {
 
   addRewards(xp: number, credits: number): void {
     this.creditsValue += Math.max(0, Math.floor(credits));
-    this.addXp(xp);
+    this.addXp(xp * this.xpGainMultiplierValue);
   }
 
   addCredits(amount: number): void {
@@ -39,6 +41,11 @@ export class RunState {
     if (this.rerollChargesValue <= 0) return false;
     this.rerollChargesValue -= 1;
     return true;
+  }
+
+  increaseXpGain(multiplier: number): void {
+    if (multiplier <= 1) return;
+    this.xpGainMultiplierValue *= multiplier;
   }
 
   consumePendingUpgrade(): void {
