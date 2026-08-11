@@ -26,14 +26,14 @@ export class WaveDirector {
     const normalizedWave = Math.max(1, Math.floor(wave));
     const reinforced = normalizedWave % 5 === 0 && normalizedWave % 10 !== 0;
     const baseBudget = this.getBasePopulationBudget(normalizedWave);
-    const populationBudget = Math.max(8, Math.round(baseBudget * (reinforced ? 1.10 : 1)));
+    const populationBudget = Math.max(8, Math.round(baseBudget * (reinforced ? 1.15 : 1)));
 
     const heavyRatio = normalizedWave < 6
       ? 0
-      : Math.min(0.28, 0.08 + (normalizedWave - 6) * 0.0022);
+      : Math.min(0.30, 0.09 + (normalizedWave - 6) * 0.0024);
     const flyingRatio = normalizedWave < 20
       ? 0
-      : Math.min(0.22, 0.08 + (normalizedWave - 20) * 0.00175);
+      : Math.min(0.24, 0.09 + (normalizedWave - 20) * 0.0019);
 
     const ratioHeavy = Math.max(0, Math.floor((populationBudget * heavyRatio) / POPULATION_COST.heavy));
     const ratioFlying = Math.max(0, Math.floor((populationBudget * flyingRatio) / POPULATION_COST.flying));
@@ -48,8 +48,8 @@ export class WaveDirector {
   static getScaling(wave: number): WaveScaling {
     const normalizedWave = Math.max(1, Math.floor(wave));
     const index = normalizedWave - 1;
-    const hpMultiplier = (1 + 0.055 * index) * Math.pow(1.018, index);
-    const damageMultiplier = (1 + 0.035 * index) * Math.pow(1.012, index);
+    const hpMultiplier = (1 + 0.065 * index) * Math.pow(1.021, index);
+    const damageMultiplier = (1 + 0.038 * index) * Math.pow(1.013, index);
 
     return {
       hpMultiplier: Math.min(1_000_000, hpMultiplier),
@@ -83,9 +83,9 @@ export class WaveDirector {
 
   private static getBasePopulationBudget(wave: number): number {
     if (wave <= 10) return 8 + (wave - 1) * 1.6;
-    if (wave <= 20) return 22.4 + (wave - 10) * 0.8;
-    if (wave <= 50) return 30.4 + (wave - 20) * 0.5;
-    return 45.4 + (wave - 50) * 0.3;
+    if (wave <= 20) return 22.4 + (wave - 10) * 0.9;
+    if (wave <= 50) return 31.4 + (wave - 20) * 0.55;
+    return 47.9 + (wave - 50) * 0.33;
   }
 
   private static getMinimumHeavyCount(wave: number): number {
