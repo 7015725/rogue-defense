@@ -62,6 +62,7 @@ export class Weapon {
   get currentState(): WeaponState { return this.state; }
   get level(): number { return this.levelValue; }
   get maxLevel(): number { return 10; }
+  get canTargetAir(): boolean { return this.definition.targetDomains.includes('AIR'); }
   get lv5Branch(): WeaponBranchChoice | null {
     if (!this.lv5BranchId) return null;
     return getWeaponProgression(this.id).lv5.find((choice) => choice.id === this.lv5BranchId) ?? null;
@@ -74,7 +75,8 @@ export class Weapon {
   get progressionLabel(): string {
     const route = this.lv5Branch ? ` · ${this.lv5Branch.title}` : '';
     const specialization = this.lv10Specialization ? ` · ${this.lv10Specialization.title}` : '';
-    return `${this.name} Lv${this.level}${route}${specialization}`;
+    const domain = this.canTargetAir ? ' · AA' : '';
+    return `${this.name} Lv${this.level}${route}${specialization}${domain}`;
   }
   get pendingBranchStage(): WeaponBranchStage | null {
     if (this.levelValue >= 5 && !this.lv5BranchId) return 5;
@@ -135,12 +137,20 @@ export class Weapon {
     const range = this.getRange();
     const targetingRule = this.getTargetingRule();
     const needsNewTarget = targetingRule === 'highest-hp'
-      || !this.target?.alive
+      || !this.target
+      || !TargetingSystem.canTarget(this.target, this.definition.targetDomains)
       || Phaser.Math.Distance.Between(this.x, this.y, this.target.x, this.target.y) > range;
 
     if (needsNewTarget) {
       this.state = 'TARGETING';
-      this.target = TargetingSystem.findTarget(targetingRule, this.x, this.y, range, targets);
+      this.target = TargetingSystem.findTarget(
+        targetingRule,
+        this.x,
+        this.y,
+        range,
+        targets,
+        this.definition.targetDomains,
+      );
     }
 
     if (!this.target) {
@@ -253,7 +263,14 @@ export class Weapon {
         if (index === 0) {
           usedIds.add(primary.id);
         } else {
-          target = TargetingSystem.findNearestTarget(this.x, this.y, this.getRange(), targets, usedIds);
+          target = TargetingSystem.findNearestTarget(
+            this.x,
+            this.y,
+            this.getRange(),
+            targets,
+            usedIds,
+            this.definition.targetDomains,
+          );
           if (!target) continue;
           usedIds.add(target.id);
         }
@@ -288,7 +305,7 @@ export class Weapon {
     const range = this.getRange();
 
     for (const candidate of targets) {
-      if (!candidate.alive) continue;
+      if (!TargetingSystem.canTarget(candidate, this.definition.targetDomains)) continue;
 
       const distance = Phaser.Math.Distance.Between(this.x, this.y, candidate.x, candidate.y);
       if (distance > range) continue;
@@ -342,7 +359,7 @@ export class Weapon {
       const stunMs = Math.max(0, this.branchEffect.stunMsBonus ?? 0);
 
       for (const target of targets) {
-        if (!target.alive) continue;
+        if (!TargetingSystem.canTarget(target, this.definition.targetDomains)) continue;
         if (Phaser.Math.Distance.Between(grenade.x, grenade.y, target.x, target.y) <= radius) {
           DamageSystem.apply(target, this.getDamageContext());
           if (stunMs > 0) target.applyStun(stunMs);
@@ -396,7 +413,14 @@ export class Weapon {
 
       fromX = hitTarget.x;
       fromY = hitTarget.y;
-      current = TargetingSystem.findNearestTarget(fromX, fromY, chainRange, targets, hitIds);
+      current = TargetingSystem.findNearestTarget(
+        fromX,
+        fromY,
+        chainRange,
+        targets,
+        hitIds,
+        this.definition.targetDomains,
+      );
     }
   }
 
@@ -405,7 +429,7 @@ export class Weapon {
     const stunMs = Math.max(0, (this.definition.stunMs ?? 0) + (this.branchEffect.stunMsBonus ?? 0));
 
     for (const target of targets) {
-      if (!target.alive) continue;
+      if (!TargetingSystem.canTarget(target, this.definition.targetDomains)) continue;
       if (Phaser.Math.Distance.Between(this.x, this.y, target.x, target.y) > range) continue;
       DamageSystem.apply(target, this.getDamageContext());
       target.applyStun(stunMs);
