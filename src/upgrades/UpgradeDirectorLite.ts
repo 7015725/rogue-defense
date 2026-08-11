@@ -9,6 +9,11 @@ export type UpgradeKind =
   | 'global-damage'
   | 'global-attack-speed'
   | 'base-max-hp'
+  | 'base-damage-reduction'
+  | 'xp-gain'
+  | 'reroll-charge'
+  | 'base-heal'
+  | 'weapon-repair'
   | 'weapon-level'
   | 'unlock-weapon'
   | 'combo';
@@ -28,6 +33,8 @@ export interface OwnedWeaponSnapshot {
   id: string;
   name: string;
   level: number;
+  currentHp: number;
+  maxHp: number;
 }
 
 export interface UpgradeContext {
@@ -39,6 +46,10 @@ export interface UpgradeContext {
   globalDamageLevel: number;
   globalAttackSpeedLevel: number;
   baseHpUpgradeLevel: number;
+  baseDamageReductionLevel: number;
+  xpGainLevel: number;
+  baseCurrentHp: number;
+  baseMaxHp: number;
 }
 
 const BASE_OPTIONS: readonly UpgradeOption[] = [
@@ -66,6 +77,30 @@ const BASE_OPTIONS: readonly UpgradeOption[] = [
     rarity: 'COMMON',
     weight: 8,
   },
+  {
+    id: 'base-damage-reduction',
+    kind: 'base-damage-reduction',
+    title: '复合装甲',
+    description: '基地受到的伤害 -5%\n最多叠加到 30%',
+    rarity: 'COMMON',
+    weight: 7,
+  },
+  {
+    id: 'xp-gain',
+    kind: 'xp-gain',
+    title: '战场分析',
+    description: '后续击杀获得的局内经验 +8%\n乘算叠加，最多选择 6 次',
+    rarity: 'RARE',
+    weight: 5,
+  },
+  {
+    id: 'reroll-charge',
+    kind: 'reroll-charge',
+    title: '战术重规划',
+    description: '立即获得 1 次升级重抽次数',
+    rarity: 'RARE',
+    weight: 4,
+  },
 ];
 
 const WEAPON_DESCRIPTIONS: Record<RandomWeaponId, string> = {
@@ -83,27 +118,41 @@ export class UpgradeDirectorLite {
 
   generate(context: UpgradeContext): UpgradeOption[] {
     const baseEligible = BASE_OPTIONS.filter((option) => this.isBaseEligible(option.kind, context));
+    const recoveryOptions = this.buildRecoveryOptions(context);
     const levelOptions = this.buildWeaponLevelOptions(context);
     const unlockOptions = this.buildWeaponUnlockOptions(context);
     const comboOptions = this.buildComboOptions(context);
-    const eligible = [...baseEligible, ...levelOptions, ...unlockOptions, ...comboOptions];
+    const eligible = [...baseEligible, ...recoveryOptions, ...levelOptions, ...unlockOptions, ...comboOptions];
     const selected: UpgradeOption[] = [];
+
+    // Every roll should contain one actual weapon progression choice whenever one exists.
+    // Prefer leveling an owned weapon; only fall back to a new weapon when all owned weapons are capped.
+    const guaranteedWeaponPool = levelOptions.length > 0 ? levelOptions : unlockOptions;
+    if (guaranteedWeaponPool.length > 0) {
+      selected.push(guaranteedWeaponPool[Math.floor(Math.random() * guaranteedWeaponPool.length)]);
+    }
 
     const hasSecondaryAa = context.ownedRandomWeaponIds.some((id) => SECONDARY_AA_IDS.has(id));
     const aaUnlockOptions = unlockOptions.filter(
       (option) => option.weaponId && SECONDARY_AA_IDS.has(option.weaponId as RandomWeaponId),
     );
+    const selectedHasAaUnlock = selected.some(
+      (option) => option.weaponId && SECONDARY_AA_IDS.has(option.weaponId as RandomWeaponId),
+    );
     const forceAaOffer = context.currentWave >= 18
       && !hasSecondaryAa
       && this.antiAirOfferCount === 0
+      && !selectedHasAaUnlock
       && aaUnlockOptions.length > 0;
 
     if (forceAaOffer) {
       selected.push(aaUnlockOptions[Math.floor(Math.random() * aaUnlockOptions.length)]);
     }
 
+    // Delay the first-new-weapon pity from Run Lv4 to Lv7. This keeps early rolls focused on
+    // strengthening the starting cannon while still preventing a weapon-starved run.
     const forceFirstWeapon = context.ownedRandomWeaponIds.length === 0
-      && context.runLevel >= 4
+      && context.runLevel >= 7
       && this.weaponOfferCount === 0
       && !selected.some((option) => option.kind === 'unlock-weapon');
 
@@ -130,6 +179,38 @@ export class UpgradeDirectorLite {
       this.antiAirOfferCount += 1;
     }
     return selected;
+  }
+
+  private buildRecoveryOptions(context: UpgradeContext): UpgradeOption[] {
+    const options: UpgradeOption[] = [];
+
+    if (context.baseCurrentHp < context.baseMaxHp * 0.85) {
+      options.push({
+        id: 'base-heal',
+        kind: 'base-heal',
+        title: '应急维修',
+        description: '立即恢复基地最大生命的 25%',
+        rarity: 'COMMON',
+        weight: 6,
+      });
+    }
+
+    const damagedWeapon = [...context.ownedWeapons]
+      .filter((weapon) => weapon.currentHp < weapon.maxHp * 0.75)
+      .sort((a, b) => (a.currentHp / a.maxHp) - (b.currentHp / b.maxHp))[0];
+    if (damagedWeapon) {
+      options.push({
+        id: `weapon-repair:${damagedWeapon.id}`,
+        kind: 'weapon-repair',
+        title: `战地维修 · ${damagedWeapon.name}`,
+        description: '立即恢复该武器最大耐久的 35%\n不会提升武器等级',
+        rarity: 'COMMON',
+        weight: 5,
+        weaponId: damagedWeapon.id,
+      });
+    }
+
+    return options;
   }
 
   private buildWeaponLevelOptions(context: UpgradeContext): UpgradeOption[] {
@@ -169,13 +250,13 @@ export class UpgradeDirectorLite {
 
     const owned = new Set<RandomWeaponId>(context.ownedRandomWeaponIds);
     const hasSecondaryAa = context.ownedRandomWeaponIds.some((id) => SECONDARY_AA_IDS.has(id));
-    const baseWeight = context.runLevel >= 3 ? 7 : 3;
+    const baseWeight = context.runLevel >= 8 ? 4 : 2;
 
     return RANDOM_WEAPON_IDS
       .filter((weaponId) => !owned.has(weaponId))
       .map((weaponId) => {
         const antiAirBoost = context.currentWave >= 15 && !hasSecondaryAa && SECONDARY_AA_IDS.has(weaponId)
-          ? 3
+          ? 2.5
           : 1;
         return {
           id: `unlock:${weaponId}`,
@@ -239,6 +320,8 @@ export class UpgradeDirectorLite {
     if (kind === 'global-damage') return context.globalDamageLevel < 10;
     if (kind === 'global-attack-speed') return context.globalAttackSpeedLevel < 10;
     if (kind === 'base-max-hp') return context.baseHpUpgradeLevel < 10;
+    if (kind === 'base-damage-reduction') return context.baseDamageReductionLevel < 6;
+    if (kind === 'xp-gain') return context.xpGainLevel < 6;
     return true;
   }
 
@@ -251,6 +334,7 @@ export class UpgradeDirectorLite {
     alreadyHasWeaponCategory: boolean,
     alreadyHasCombo: boolean,
   ): number {
+    if (option.kind === 'unlock-weapon' && alreadyHasWeaponCategory) return option.weight * 0.20;
     if (this.isWeaponCategory(option) && alreadyHasWeaponCategory) return option.weight * 0.35;
     if (option.kind === 'combo' && alreadyHasCombo) return option.weight * 0.35;
     return option.weight;
