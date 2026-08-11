@@ -15,6 +15,7 @@ export const AIR_LANE_OFFSETS = [-260, -130, 0, 130, 260] as const;
 export const WAVE_DURATION_MS = 30_000;
 export const WAVE_SPAWN_WINDOW_MS = 24_000;
 export const WAVE20_AIR_ESCORT_COUNT = 6;
+export const WAVE30_AIR_ESCORT_COUNT = 8;
 
 export const TEST_WAVE_COMPOSITIONS = [
   { infantry: 8, heavy: 0, flying: 0 },
@@ -36,6 +37,16 @@ export const TEST_WAVE_COMPOSITIONS = [
   { infantry: 23, heavy: 4, flying: 0 },
   { infantry: 24, heavy: 4, flying: 0 },
   { infantry: 25, heavy: 5, flying: 0 },
+  null,
+  { infantry: 24, heavy: 4, flying: 2 },
+  { infantry: 25, heavy: 4, flying: 2 },
+  { infantry: 25, heavy: 5, flying: 3 },
+  { infantry: 26, heavy: 5, flying: 3 },
+  { infantry: 27, heavy: 5, flying: 3 },
+  { infantry: 27, heavy: 6, flying: 4 },
+  { infantry: 28, heavy: 6, flying: 4 },
+  { infantry: 29, heavy: 6, flying: 5 },
+  { infantry: 30, heavy: 7, flying: 5 },
 ] as const;
 
 export const BASE_MAX_HP = 1000;
@@ -110,6 +121,8 @@ export const AUTO_CANNON: WeaponDefinition = {
   reloadTimeMs: 1600,
   critChance: 0.05,
   critMultiplier: 2,
+  maxHp: 600,
+  autoRepairPerSecond: 15,
   color: 0xe2e8f0,
 };
 
@@ -127,6 +140,8 @@ export const LMG: WeaponDefinition = {
   reloadTimeMs: 2400,
   critChance: 0.05,
   critMultiplier: 2,
+  maxHp: 500,
+  autoRepairPerSecond: 13,
   color: 0xfacc15,
 };
 
@@ -144,6 +159,8 @@ export const SHOTGUN: WeaponDefinition = {
   reloadTimeMs: 2300,
   critChance: 0.05,
   critMultiplier: 2,
+  maxHp: 520,
+  autoRepairPerSecond: 13,
   color: 0xfb7185,
   coneAngleDeg: 58,
   pelletCount: 12,
@@ -163,6 +180,8 @@ export const SNIPER: WeaponDefinition = {
   reloadTimeMs: 3000,
   critChance: 0.25,
   critMultiplier: 2.5,
+  maxHp: 420,
+  autoRepairPerSecond: 11,
   color: 0x93c5fd,
 };
 
@@ -180,6 +199,8 @@ export const AUTO_GL: WeaponDefinition = {
   reloadTimeMs: 2700,
   critChance: 0.05,
   critMultiplier: 2,
+  maxHp: 480,
+  autoRepairPerSecond: 12,
   color: 0xf97316,
   aoeRadius: 140,
   impactDelayMs: 850,
@@ -199,6 +220,8 @@ export const TESLA: WeaponDefinition = {
   reloadTimeMs: 0,
   critChance: 0,
   critMultiplier: 1,
+  maxHp: 460,
+  autoRepairPerSecond: 12,
   color: 0x67e8f9,
   chainCount: 3,
   chainRange: 230,
