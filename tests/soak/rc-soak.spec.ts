@@ -151,8 +151,18 @@ async function measureStressFps(page: Page, wave: 1 | 50 | 100): Promise<number>
   await clickLogical(page, 910, 378);
   await clickLogical(page, 500, 675);
   await expect(app).toHaveAttribute('data-scene', 'combat');
-  await expect.poll(async () => Number(await app.getAttribute('data-enemy-count'))).toBeGreaterThanOrEqual(300);
 
+  await page.evaluate(() => {
+    type CombatProbe = { waveManager: { update: (deltaMs: number, bossAlive: boolean) => unknown[] } };
+    const game = (window as unknown as {
+      __rogueDefenseGame?: { scene: { getScene: (key: string) => unknown } };
+    }).__rogueDefenseGame;
+    const combat = game?.scene.getScene('CombatScene') as CombatProbe | undefined;
+    if (!combat) throw new Error('DEV Phaser game probe unavailable for perf hold');
+    combat.waveManager.update = () => [];
+  });
+
+  await expect.poll(async () => Number(await app.getAttribute('data-enemy-count'))).toBeGreaterThanOrEqual(300);
   await page.waitForTimeout(500);
 
   return page.evaluate(() => new Promise<number>((resolve) => {
