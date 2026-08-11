@@ -53,4 +53,16 @@
 - ArmorBreak 暂不加入新卡池，预留给 M0.7 震荡破甲 Combo 和未来武器核心。
 - 有甲敌人显示 Armor Grade 标签，HUD 在 Heavy 存活时显示 Heavy 数量。
 
-完整细节见 `game-design-v0.2.md`、`m0.4-design.md`、`m0.5-design.md`。
+## 2026-08-11 — M0.6 Air + Anti-Air
+
+- TargetDomain 正式加入 GROUND / AIR；Enemy 与 WeaponDefinition 都显式声明目标域。
+- Air 使用独立 AirPath：更宽的顶部入口、轻量横向摆动、向 Base 汇聚，但与 Ground 共用 pathProgress 概念。
+- 第一种空军为 Recon Drone：HP 60、Armor 0、MoveSpeed 90、AttackDamage 8、AttackInterval 0.8s、EXP 7、Credits 3。
+- Flying 不提前出现：Wave 1～19 无 Air，Wave 20 Boss Gate 首次生成 6 架 Recon Drone 护航。
+- Wave 10 Boss Gate 不再结束测试；Boss 死亡后清理残怪并继续 Wave 11。Wave 20 Boss 死亡后清理护航并结束 M0.6。
+- Auto Cannon / LMG / Sniper 支持 Ground + Air；Shotgun / Auto-GL / Tesla 仅 Ground。
+- TargetingSystem 统一执行 Domain 合法性；Cone / AOE / Chain / Split Target 不能绕过目标域限制。
+- 防空结构保护：Wave 15+ 缺副防空时 LMG / Sniper 解锁权重 ×3；Wave 18+ 若仍缺且此前未展示过，则下一次升级界面强制包含 LMG 或 Sniper。
+- 防空保底只保证出现选项，不自动给予；固定 Auto Cannon 提供最低防空安全线。
+
+完整细节见 `game-design-v0.2.md`、`m0.5-design.md`、`m0.6-design.md`。
