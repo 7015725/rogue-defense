@@ -15,10 +15,22 @@ export class StatusEffectSystem {
     private readonly onDotDamage: (amount: number) => void,
   ) {}
 
+  get hasActiveEffects(): boolean {
+    return this.active.size > 0;
+  }
+
+  get needsUpdate(): boolean {
+    return this.active.size > 0 || (this.isBoss && this.controlResistance > 0);
+  }
+
   update(deltaMs: number): void {
+    if (!this.needsUpdate) return;
+
     if (this.isBoss) {
       this.controlResistance = Math.max(0, this.controlResistance - 0.00005 * deltaMs);
     }
+
+    if (this.active.size === 0) return;
 
     for (const [type, status] of this.active) {
       status.remainingMs = Math.max(0, status.remainingMs - deltaMs);
@@ -134,6 +146,7 @@ export class StatusEffectSystem {
   }
 
   get label(): string {
+    if (this.active.size === 0) return '';
     const parts: string[] = [];
     const burn = this.active.get('BURN');
     if (burn) parts.push(`BURN×${burn.stacks}`);
