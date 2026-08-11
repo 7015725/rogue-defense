@@ -15,6 +15,7 @@
 - `main` push 继续触发 GitHub Actions CI。
 - CI 使用 concurrency；同一分支的新提交会取消已过期的旧构建，只保留最新状态验证。
 - CI 会把最终构建状态回写为 `ci/build` commit status，便于直接验证 `main`。
+- M0.9 起 CI 失败时额外回写 `ci/error: ...` status context，直接暴露 TypeScript/Vite 最后一条错误摘要，便于 direct-main 修复。
 
 ## 2026-08-11 — M0.3 武器基础形态
 
@@ -98,4 +99,23 @@
 - 新武器和替换武器即时继承当前 Global Modifiers 与 Active Combos。
 - Wave 21～29 开始在常规敌潮中混入 Flying；Wave 30 Boss 使用 8 架 Recon Drone 护航。
 
-完整细节见 `game-design-v0.2.md`、`m0.7-design.md`、`m0.8-design.md`。
+## 2026-08-11 — M0.9 Settlement + Permanent Progress
+
+- Phaser 正式拆为 MainMenuScene / CombatScene / SettlementScene；应用启动进入 Main Menu。
+- Run End 统一产生 `RunSummary`：Difficulty、Highest Wave、Run Level、Kills、Boss Kills、结束原因。
+- Base Destroyed、主动结束、Wave30 测试完成都进入同一个 Settlement；主动结束获得 100% 正常结算，不做惩罚。
+- 正式流程取消 `R` 无结算重开；`E / 结束本局` 进入 Settlement。
+- Settlement 奖励分为 Gold + Account EXP，并受 Difficulty Reward Multiplier 影响；奖励公式属于 V1 原型值。
+- Account Level 上限 100；每级所需 EXP 为 `100 + (Level-1)×30`；每升一级获得 1 Tech Point。
+- 永久存档使用 `rogue-defense.save`，Schema Version = 1；只保存永久数据，不序列化 Scene / Enemy / Weapon / Run 状态。
+- SaveService 对缺字段、越界值、旧/未知 version 做 normalize / migrate / sanitize；非法 JSON 或 localStorage 异常回退默认 Save。
+- Lifetime Stats 记录 Runs、Kills、BossKills、TotalGoldEarned、HighestRunLevel；High Wave 按 Difficulty 独立保存。
+- Difficulty I～V 数据层已建立。当前通用倍率：HP 1.00/1.20/1.45/1.75/2.10；Damage 1.00/1.10/1.20/1.35/1.50；Settlement Reward 1.00/1.15/1.35/1.60/2.00。
+- 下一难度仍严格要求当前最高已解锁 Difficulty 达到 Wave100；当前 Wave30 原型不会临时降低解锁条件。
+- 首版 Gold Tech：火力训练（每级开局 Damage +3%，Max10）、基地加固（每级 Base MaxHP +5%，Max10）、战备资金（每级开局 Credits +20，Max5）。
+- 首版 Tech Point Tech：战术加速（依次解锁 2×/3×/4×）、预备重抽（每级开局 +1 Reroll Charge，Max2）。
+- Tech Tree 支持永久免费重置，并原额返还全部 Gold / Tech Point 投入。
+- CombatScene 在 Run 开始时读取 Permanent Save，使 Meta 起点和局内 Upgrade 正常叠加。
+- M0.9 是最后一个主要系统里程碑；后续进入 V0.1 Integration，不再优先扩新系统。
+
+完整细节见 `game-design-v0.2.md`、`m0.8-design.md`、`m0.9-design.md`。
