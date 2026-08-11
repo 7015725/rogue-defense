@@ -1,7 +1,8 @@
 export type Team = 'player' | 'enemy';
 
 export type ArmorGrade = 'UNARMORED' | 'LIGHT' | 'MEDIUM' | 'HEAVY';
-export type EnemyKind = 'infantry' | 'heavy' | 'boss';
+export type TargetDomain = 'GROUND' | 'AIR';
+export type EnemyKind = 'infantry' | 'heavy' | 'flying' | 'boss';
 
 export interface DamageContext {
   baseDamage: number;
@@ -22,6 +23,7 @@ export interface Targetable {
   readonly y: number;
   readonly alive: boolean;
   readonly pathProgress: number;
+  readonly domain: TargetDomain;
   readonly armor: number;
   readonly armorGrade: ArmorGrade;
   readonly currentHp: number;
@@ -35,6 +37,7 @@ export interface EnemyDefinition {
   readonly hp: number;
   readonly armor: number;
   readonly armorGrade: ArmorGrade;
+  readonly domain: TargetDomain;
   readonly moveSpeed: number;
   readonly attackDamage: number;
   readonly attackIntervalMs: number;
@@ -52,6 +55,7 @@ export interface WeaponDefinition {
   readonly name: string;
   readonly mode: WeaponMode;
   readonly targetingRule: TargetingRule;
+  readonly targetDomains: readonly TargetDomain[];
   readonly damage: number;
   readonly attackIntervalMs: number;
   readonly range: number;
