@@ -4,13 +4,18 @@ import { Projectile } from '../entities/Projectile';
 
 export class ProjectilePool {
   private readonly projectiles: Projectile[];
+  private activeCountValue = 0;
 
   constructor(private readonly scene: Phaser.Scene, initialSize = 256) {
     this.projectiles = Array.from({ length: initialSize }, () => new Projectile(scene));
   }
 
   get activeCount(): number {
-    return this.projectiles.reduce((count, projectile) => count + (projectile.inUse ? 1 : 0), 0);
+    return this.activeCountValue;
+  }
+
+  get size(): number {
+    return this.projectiles.length;
   }
 
   fire(
@@ -29,6 +34,16 @@ export class ProjectilePool {
   }
 
   update(deltaMs: number): void {
-    for (const projectile of this.projectiles) projectile.update(deltaMs);
+    let active = 0;
+    for (const projectile of this.projectiles) {
+      projectile.update(deltaMs);
+      if (projectile.inUse) active += 1;
+    }
+    this.activeCountValue = active;
+  }
+
+  clear(): void {
+    for (const projectile of this.projectiles) projectile.release();
+    this.activeCountValue = 0;
   }
 }
