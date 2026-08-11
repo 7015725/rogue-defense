@@ -2,9 +2,11 @@
 
 ## 当前里程碑
 
+- [`m0.4-design.md`](m0.4-design.md)：所有 6 把武器 Lv1～10、Lv5 α/β/γ 路线、Lv10 路线专精与 BranchEffect 实现规格。
+- [`m0.4-validation.md`](m0.4-validation.md)：M0.4 自动构建、路线行为、Pending Upgrade 顺序与回归验证清单。
 - [`m0.3-design.md`](m0.3-design.md)：五种随机武器基础形态、攻击模式、索敌规则与随机武器保底。
-- [`m0.3-validation.md`](m0.3-validation.md)：M0.3 自动构建与手动玩法验证清单。
-- [`m0.2-design.md`](m0.2-design.md)：Run EXP、三选一、Skip Credits、Auto Cannon 等级与首把 LMG 的 M0.2 实现规格。
+- [`m0.3-validation.md`](m0.3-validation.md)：M0.3 验证清单。
+- [`m0.2-design.md`](m0.2-design.md)：Run EXP、三选一、Skip Credits 与首把 LMG 的 M0.2 实现规格。
 - [`m0.2-validation.md`](m0.2-validation.md)：M0.2 验证记录。
 - [`m0.1-validation.md`](m0.1-validation.md)：M0.1 基线验证记录。
 
