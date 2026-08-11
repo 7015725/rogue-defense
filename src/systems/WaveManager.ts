@@ -1,19 +1,11 @@
 import {
-  TEST_WAVE_COMPOSITIONS,
-  WAVE20_AIR_ESCORT_COUNT,
-  WAVE30_AIR_ESCORT_COUNT,
   WAVE_DURATION_MS,
   WAVE_SPAWN_WINDOW_MS,
 } from '../combat/constants';
 import type { EnemyKind } from '../combat/types';
+import { WaveDirector, type WaveComposition } from './WaveDirector';
 
 export type SpawnRequest = { kind: EnemyKind; laneIndex: number };
-
-interface WaveComposition {
-  readonly infantry: number;
-  readonly heavy: number;
-  readonly flying: number;
-}
 
 export class WaveManager {
   private waveNumber = 1;
@@ -22,33 +14,37 @@ export class WaveManager {
   private spawnedHeavyThisWave = 0;
   private spawnedFlyingThisWave = 0;
   private bossSpawned = false;
-  private completed = false;
   private checkpointClearRequested = false;
   private shopRequestedWave: number | null = null;
   private waitingForShop = false;
   private laneCursor = 0;
 
   get wave(): number { return this.waveNumber; }
-  get isComplete(): boolean { return this.completed; }
-  get isBossWave(): boolean { return this.waveNumber % 10 === 0 && this.waveNumber <= 30; }
+  get isComplete(): boolean { return false; }
+  get isBossWave(): boolean { return this.waveNumber % 10 === 0; }
+  get isReinforcedWave(): boolean {
+    return !this.isBossWave && WaveDirector.getRegularComposition(this.waveNumber).reinforced;
+  }
   get shopPending(): boolean { return this.waitingForShop; }
+  get populationBudget(): number {
+    return this.isBossWave ? 0 : WaveDirector.getRegularComposition(this.waveNumber).populationBudget;
+  }
 
   update(deltaMs: number, bossAlive: boolean): SpawnRequest[] {
-    if (this.completed || this.waitingForShop) return [];
+    if (this.waitingForShop) return [];
 
+    WaveDirector.setActiveSpawnWave(this.waveNumber);
     if (this.isBossWave) return this.updateBossWave(bossAlive);
 
-    const composition = TEST_WAVE_COMPOSITIONS[this.waveNumber - 1];
-    if (!composition) return [];
-
+    const composition = WaveDirector.getRegularComposition(this.waveNumber);
     const requests: SpawnRequest[] = [];
     const targetCount = composition.infantry + composition.heavy + composition.flying;
     const spawnInterval = WAVE_SPAWN_WINDOW_MS / Math.max(1, targetCount);
     this.waveElapsedMs += deltaMs;
 
     while (
-      this.spawnedThisWave < targetCount &&
-      this.spawnedThisWave * spawnInterval <= Math.min(this.waveElapsedMs, WAVE_SPAWN_WINDOW_MS)
+      this.spawnedThisWave < targetCount
+      && this.spawnedThisWave * spawnInterval <= Math.min(this.waveElapsedMs, WAVE_SPAWN_WINDOW_MS)
     ) {
       const kind = this.pickSpawnKind(composition, targetCount);
       requests.push({ kind, laneIndex: this.laneCursor % 5 });
@@ -82,12 +78,6 @@ export class WaveManager {
   resumeAfterShop(): void {
     if (!this.waitingForShop) return;
     this.waitingForShop = false;
-
-    if (this.waveNumber >= 30) {
-      this.completed = true;
-      return;
-    }
-
     this.waveNumber += 1;
     this.waveElapsedMs = 0;
     this.bossSpawned = false;
@@ -98,11 +88,7 @@ export class WaveManager {
     if (!this.bossSpawned) {
       this.bossSpawned = true;
       const requests: SpawnRequest[] = [{ kind: 'boss', laneIndex: 2 }];
-      const escortCount = this.waveNumber === 20
-        ? WAVE20_AIR_ESCORT_COUNT
-        : this.waveNumber === 30
-          ? WAVE30_AIR_ESCORT_COUNT
-          : 0;
+      const escortCount = WaveDirector.getBossEscortCount(this.waveNumber);
 
       for (let index = 0; index < escortCount; index += 1) {
         requests.push({ kind: 'flying', laneIndex: index % 5 });
