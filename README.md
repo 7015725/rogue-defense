@@ -4,9 +4,9 @@
 
 ## 当前阶段
 
-**V0.1 Integration — Endless Wave / Wave 100**
+**V0.1 Integration — Playtest / Performance / Mobile**
 
-M0.1～M0.9 的主要系统已经全部落地。当前阶段停止扩张主要系统，转向真实长局、数值、UI、性能与浏览器运行时回归。
+M0.1～M0.9 的主要系统已经全部落地，Endless Wave 与 W100 解锁链也已接通。当前阶段停止扩张主要系统，转向真实长局、开发测试效率、数值、UI、性能与浏览器运行时回归。
 
 当前代码已经具备：
 
@@ -18,8 +18,7 @@ M0.1～M0.9 的主要系统已经全部落地。当前阶段停止扩张主要�
 - 每 10 Wave Boss Gate + Boss Shop，W100 后继续 W101+；
 - Wave HP / Damage 连续成长曲线；
 - W6 起 Heavy，W20 Boss 首次 Air Escort，W21+ 常规 Flying；
-- Run EXP / Combat Credits 随 Wave 温和增长，目标 W100 Run Lv 约 58～70；
-- Run EXP / Run Level / Credits；
+- Run EXP / Combat Credits 随 Wave 温和增长；
 - Level Up 三选一、Skip 与 Reroll；
 - Slot 1 固定 Auto Cannon + 4 个随机武器槽；
 - 五种随机武器池：LMG、Shotgun、Sniper、Auto-GL、Tesla；
@@ -33,9 +32,17 @@ M0.1～M0.9 的主要系统已经全部落地。当前阶段停止扩张主要�
 - Account Lv1～100、Gold、Tech Point；
 - 首版局外 Tech Tree + 免费 Respec；
 - Difficulty I～V、独立 High Wave 与 W100 解锁下一难度；
-- Versioned localStorage Save Schema v1 + normalize / migrate / 坏档回退；
+- Versioned localStorage Save Schema v1；
 - Lifetime Runs / Kills / Boss Kills / Gold / Highest Run Level；
-- 1×～4× 速度由局外科技逐步解锁。
+- 1×～4× 速度由局外科技逐步解锁；
+- 战斗内 1×～4× 触控速度按钮；
+- DEV W1/W10/W20/W50/W80/W100 快捷启动；
+- DEV Stress 300 性能测试；
+- DEV Run 结算预览但不写永久 Save；
+- Projectile Pool Active Count 缓存与清场；
+- Enemy Status Text 懒创建 + 150ms 可视刷新；
+- Combat HUD 100ms 刷新节流；
+- `100dvh` / Safe Area / Touch 行为移动端适配。
 
 Wave100 是 Difficulty 解锁里程碑，**不是单局结束点**。玩家可以继续当前局直到 Base Destroyed 或主动结束。
 
@@ -64,21 +71,38 @@ npm run build
 
 ## 控制
 
-- `1`：1×
-- `2`：2×（需科技）
-- `3`：3×（需科技）
-- `4`：4×（需科技）
+- 战斗 HUD `1× / 2× / 3× / 4×`：触控切速（仍受科技解锁限制）
+- 键盘 `1～4`：切换速度
 - `E`：主动结束本局并正常结算
 
-升级、路线、Boss 商店和主菜单均支持鼠标/触摸点击。
+升级、路线、Boss 商店、武器替换和主菜单均支持鼠标/触摸点击。
+
+## DEV Playtest
+
+本地 `npm run dev` 会自动显示 DEV LAUNCH。Production 构建可显式使用：
+
+```text
+?dev=1
+```
+
+DEV 面板支持：
+
+```text
+W1 / W10 / W20 / W50 / W80 / W100
+Stress 300
+```
+
+快捷启动或 Stress 局会标记为 DEV Run，结算仅预览，不修改永久存档。
+
+详见 [`docs/v0.1-playtest-tools.md`](docs/v0.1-playtest-tools.md)。
 
 ## 文档
 
 - [设计文档索引](docs/README.md)
 - [V0.1 Integration](docs/v0.1-integration.md)
+- [V0.1 Playtest / Performance Tools](docs/v0.1-playtest-tools.md)
 - [V0.1 Validation](docs/v0.1-validation.md)
 - [M0.9 设计](docs/m0.9-design.md)
-- [M0.9 验证清单](docs/m0.9-validation.md)
 - [V0.2 游戏系统设计总稿](docs/game-design-v0.2.md)
 - [V0.1 升级卡池 V1](docs/upgrade-card-pool-v0.1.md)
 - [Upgrade Director V1](docs/upgrade-director-v1.md)
@@ -98,6 +122,8 @@ M0.8  Boss Shop                    ✓
 M0.9  结算 + 科技树 + Save         ✓
 V0.1  Integration / Playtest       ← 当前
        ↓
+V0.1 Web Release Candidate
+       ↓
 Web / PWA
        ↓
 Android APK
@@ -107,8 +133,9 @@ Android APK
 
 - 实际浏览器从 W1 跑到 W100；
 - W99 → W100 Boss → Shop → W101 完整流程；
-- Difficulty W100 解锁下一档；
+- 正常 Run 的 Difficulty W100 解锁下一档；
 - Boss Shop / Upgrade Director 长局经济；
-- 手机竖屏与触摸交互；
-- 300 Active Enemies + 4× 性能；
+- Android Chrome / iOS Safari 竖屏与触摸交互；
+- DEV W1/W50/W100 + Stress 300 性能；
+- 4× 下 Projectile / Status / Combo 峰值性能；
 - Save 刷新、坏档和长局 Settlement 回归。
