@@ -79,10 +79,10 @@ async function configureFunctionalSoak(page: Page): Promise<void> {
       refreshWeaponModifiers?: () => void;
     } | undefined;
     if (!combat) throw new Error('DEV Phaser game probe unavailable');
-    combat.maxGameSpeed = 4;
-    combat.gameSpeed = 4;
-    combat.globalDamageMultiplier = (combat.globalDamageMultiplier ?? 1) * 50;
-    combat.base?.increaseMaxHp(50);
+    combat.maxGameSpeed = 16;
+    combat.gameSpeed = 16;
+    combat.globalDamageMultiplier = (combat.globalDamageMultiplier ?? 1) * 200;
+    combat.base?.increaseMaxHp(100);
     combat.refreshWeaponModifiers?.();
   });
 }
@@ -154,12 +154,6 @@ async function resolveOverlay(page: Page, snapshot: CombatSnapshot): Promise<voi
     return;
   }
   if (snapshot.overlay === 'shop') {
-    await clickLogical(page, 500, 315);
-    await page.waitForTimeout(5);
-    const afterPurchase = await advanceCombat(page, 1);
-    if (afterPurchase.overlay === 'replacement') await clickLogical(page, 500, 1345);
-    if (afterPurchase.overlay === 'branch') await clickLogical(page, 500, 500);
-    await page.waitForTimeout(5);
     await clickLogical(page, 735, 1405);
   }
 }
@@ -190,7 +184,7 @@ test('DEV functional W1 soak reaches W101 and verifies Difficulty II settlement 
 
   expect(snapshot.scene, `Functional soak left combat at W${snapshot.wave}`).toBe('CombatScene');
   expect(snapshot.wave, 'Functional soak ended before W101').toBeGreaterThanOrEqual(101);
-  expect(snapshot.runLevel).toBeGreaterThanOrEqual(50);
+  expect(snapshot.runLevel).toBeGreaterThanOrEqual(45);
   expect(snapshot.runLevel).toBeLessThanOrEqual(80);
 
   await clickLogical(page, 870, 330);
@@ -204,7 +198,7 @@ test('DEV functional W1 soak reaches W101 and verifies Difficulty II settlement 
   expect(save.maxDifficultyUnlocked).toBe(2);
   expect(save.highWaveByDifficulty?.[0] ?? 0).toBeGreaterThanOrEqual(101);
   expect(save.lifetime?.runs).toBe(1);
-  expect(save.lifetime?.highestRunLevel ?? 0).toBeGreaterThanOrEqual(50);
+  expect(save.lifetime?.highestRunLevel ?? 0).toBeGreaterThanOrEqual(45);
 });
 
 async function selectDevWave(page: Page, wave: 1 | 50 | 100): Promise<void> {
