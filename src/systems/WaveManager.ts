@@ -30,7 +30,9 @@ export class WaveManager {
 
   get wave(): number { return this.waveNumber; }
   get isComplete(): boolean { return false; }
-  get isBossWave(): boolean { return this.waveNumber % 10 === 0; }
+  get isBossWave(): boolean {
+    return this.waveNumber >= 20 && this.waveNumber % 10 === 0;
+  }
   get isReinforcedWave(): boolean {
     return !this.isBossWave && WaveDirector.getRegularComposition(this.waveNumber).reinforced;
   }
@@ -61,9 +63,13 @@ export class WaveManager {
     }
 
     if (this.waveElapsedMs >= WAVE_DURATION_MS) {
-      this.waveNumber += 1;
-      this.waveElapsedMs -= WAVE_DURATION_MS;
-      this.resetRegularWaveCounters();
+      if (this.isShopCheckpointWave()) {
+        this.requestCheckpointShop();
+      } else {
+        this.waveNumber += 1;
+        this.waveElapsedMs -= WAVE_DURATION_MS;
+        this.resetRegularWaveCounters();
+      }
     }
 
     return requests;
@@ -120,10 +126,19 @@ export class WaveManager {
 
     if (bossAlive) return [];
 
+    this.requestCheckpointShop();
+    return [];
+  }
+
+  private requestCheckpointShop(): void {
+    if (this.waitingForShop) return;
     this.checkpointClearRequested = true;
     this.waitingForShop = true;
     this.shopRequestedWave = this.waveNumber;
-    return [];
+  }
+
+  private isShopCheckpointWave(): boolean {
+    return this.waveNumber % 10 === 0;
   }
 
   private ensureSpawnPlan(composition: WaveComposition): void {
