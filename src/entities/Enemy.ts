@@ -24,12 +24,13 @@ export class Enemy implements Targetable {
   readonly armor: number;
 
   private hp: number;
-  private readonly maxHp: number;
+  private readonly maxHpValue: number;
   private readonly moveSpeed: number;
   private readonly attackDamage: number;
   private readonly attackIntervalMs: number;
   private readonly rewards: EnemyRewards;
   private attackTimerMs = 0;
+  private stunTimerMs = 0;
   private readonly spawnX: number;
   private readonly shape: Phaser.GameObjects.Rectangle;
   private readonly healthBar: Phaser.GameObjects.Rectangle;
@@ -43,7 +44,7 @@ export class Enemy implements Targetable {
     private readonly onKilled: (enemy: Enemy, rewards: EnemyRewards) => void,
   ) {
     const stats = kind === 'boss' ? BOSS : INFANTRY;
-    this.maxHp = stats.hp;
+    this.maxHpValue = stats.hp;
     this.hp = stats.hp;
     this.armor = stats.armor;
     this.moveSpeed = stats.moveSpeed;
@@ -62,6 +63,8 @@ export class Enemy implements Targetable {
   get x(): number { return this.shape.x; }
   get y(): number { return this.shape.y; }
   get alive(): boolean { return !this.dead; }
+  get currentHp(): number { return this.hp; }
+  get maxHp(): number { return this.maxHpValue; }
 
   get pathProgress(): number {
     return Phaser.Math.Clamp((this.y - ENEMY_SPAWN_Y) / (BASE_ATTACK_Y - ENEMY_SPAWN_Y), 0, 1);
@@ -69,6 +72,11 @@ export class Enemy implements Targetable {
 
   update(deltaMs: number): void {
     if (this.dead) return;
+
+    if (this.stunTimerMs > 0) {
+      this.stunTimerMs = Math.max(0, this.stunTimerMs - deltaMs);
+      return;
+    }
 
     if (this.y < BASE_ATTACK_Y) {
       const nextProgress = Phaser.Math.Clamp(
@@ -102,6 +110,11 @@ export class Enemy implements Targetable {
     }
   }
 
+  applyStun(durationMs: number): void {
+    if (this.dead) return;
+    this.stunTimerMs = Math.max(this.stunTimerMs, Math.max(0, durationMs));
+  }
+
   destroy(): void {
     if (!this.shape.scene) return;
     this.dead = true;
@@ -110,7 +123,7 @@ export class Enemy implements Targetable {
   }
 
   private updateHealthBar(): void {
-    const ratio = Phaser.Math.Clamp(this.hp / this.maxHp, 0, 1);
+    const ratio = Phaser.Math.Clamp(this.hp / this.maxHpValue, 0, 1);
     this.healthBar.scaleX = ratio;
   }
 
