@@ -3,7 +3,7 @@ import { expect, test, type Page } from '@playwright/test';
 const LOGICAL_WIDTH = 1000;
 const LOGICAL_HEIGHT = 1600;
 
-async function clickLogical(page: Page, x: number, y: number): Promise<void> {
+async function getScreenPoint(page: Page, x: number, y: number): Promise<{ x: number; y: number }> {
   const canvas = page.locator('canvas');
   await expect(canvas).toBeVisible();
 
@@ -22,17 +22,24 @@ async function clickLogical(page: Page, x: number, y: number): Promise<void> {
     };
   }, { logicalX: x, logicalY: y });
 
-  if (transformed) {
-    await page.mouse.click(transformed.x, transformed.y);
-    return;
-  }
+  if (transformed) return transformed;
 
   const box = await canvas.boundingBox();
   if (!box) throw new Error('Canvas has no bounding box');
-  await page.mouse.click(
-    box.x + (x / LOGICAL_WIDTH) * box.width,
-    box.y + (y / LOGICAL_HEIGHT) * box.height,
-  );
+  return {
+    x: box.x + (x / LOGICAL_WIDTH) * box.width,
+    y: box.y + (y / LOGICAL_HEIGHT) * box.height,
+  };
+}
+
+async function clickLogical(page: Page, x: number, y: number): Promise<void> {
+  const point = await getScreenPoint(page, x, y);
+  await page.mouse.click(point.x, point.y);
+}
+
+async function tapLogical(page: Page, x: number, y: number): Promise<void> {
+  const point = await getScreenPoint(page, x, y);
+  await page.touchscreen.tap(point.x, point.y);
 }
 
 function collectBrowserErrors(page: Page): string[] {
@@ -129,6 +136,84 @@ test('mobile portrait viewport fills canvas and starts with touch input', async 
   await expect(app).toHaveAttribute('data-scene', 'combat');
   await expect(app).toHaveAttribute('data-wave', '1');
   expect(errors).toEqual([]);
+});
+
+test('mobile touch can operate upgrade, branch, shop, and replacement overlays', async ({ browser }) => {
+  const context = await browser.newContext({ viewport: { width: 390, height: 844 }, hasTouch: true, isMobile: true });
+  const page = await context.newPage();
+  const errors = collectBrowserErrors(page);
+  await page.goto('/?dev=1');
+
+  const app = page.locator('#app');
+  await expect(app).toHaveAttribute('data-scene', 'menu');
+  await tapLogical(page, 500, 675);
+  await expect(app).toHaveAttribute('data-scene', 'combat');
+
+  await page.evaluate(() => {
+    type UpgradeOverlayProbe = { show: (options: unknown[], skipReward: number, rerolls: number) => void };
+    type CombatProbe = { upgradeOverlay: UpgradeOverlayProbe };
+    const game = (window as Window & { __rogueDefenseGame?: { scene: { getScene: (key: string) => unknown } } }).__rogueDefenseGame;
+    const combat = game?.scene.getScene('CombatScene') as CombatProbe | undefined;
+    combat?.upgradeOverlay.show([
+      { id: 'mobile-a', kind: 'global-damage', title: '强化弹药', description: '所有武器伤害 +10%', rarity: 'COMMON', weight: 1 },
+      { id: 'mobile-b', kind: 'global-attack-speed', title: '快速循环', description: '所有武器攻击速度 +8%', rarity: 'COMMON', weight: 1 },
+      { id: 'mobile-c', kind: 'base-max-hp', title: '加固基地', description: '基地最大生命 +12%', rarity: 'RARE', weight: 1 },
+    ], 25, 1);
+  });
+  await expect(app).toHaveAttribute('data-overlay', 'upgrade');
+  await tapLogical(page, 500, 390);
+  await expect(app).toHaveAttribute('data-overlay', 'none');
+
+  await page.evaluate(() => {
+    type BranchProbe = { show: (weapon: unknown, stage: 5, choices: unknown[]) => void };
+    type WeaponProbe = { getBranchChoices: (stage: 5) => unknown[] };
+    type CombatProbe = { branchOverlay: BranchProbe; weapons: WeaponProbe[] };
+    const game = (window as Window & { __rogueDefenseGame?: { scene: { getScene: (key: string) => unknown } } }).__rogueDefenseGame;
+    const combat = game?.scene.getScene('CombatScene') as CombatProbe | undefined;
+    const weapon = combat?.weapons[0];
+    if (combat && weapon) combat.branchOverlay.show(weapon, 5, weapon.getBranchChoices(5));
+  });
+  await expect(app).toHaveAttribute('data-overlay', 'branch');
+  await tapLogical(page, 500, 405);
+  await expect(app).toHaveAttribute('data-overlay', 'none');
+
+  await page.evaluate(() => {
+    type ShopProbe = { show: (wave: number, items: unknown[], purchased: Set<string>, credits: number, refreshCost: number) => void };
+    type CombatProbe = { bossShopOverlay: ShopProbe };
+    const game = (window as Window & { __rogueDefenseGame?: { scene: { getScene: (key: string) => unknown } } }).__rogueDefenseGame;
+    const combat = game?.scene.getScene('CombatScene') as CombatProbe | undefined;
+    const items = Array.from({ length: 5 }, (_, index) => ({
+      id: `mobile-shop-${index}`,
+      kind: 'global-damage',
+      title: `测试商品 ${index + 1}`,
+      description: '手机竖屏商品说明可读性测试',
+      cost: 40 + index * 10,
+      rarity: index === 4 ? 'EPIC' : index === 3 ? 'RARE' : 'COMMON',
+    }));
+    combat?.bossShopOverlay.show(10, items, new Set<string>(), 999, 60);
+  });
+  await expect(app).toHaveAttribute('data-overlay', 'shop');
+  await tapLogical(page, 735, 1370);
+  await expect(app).toHaveAttribute('data-overlay', 'none');
+
+  await page.evaluate(() => {
+    type ReplacementProbe = { show: (name: string, level: number, candidates: unknown[]) => void };
+    type CombatProbe = { replacementOverlay: ReplacementProbe };
+    const game = (window as Window & { __rogueDefenseGame?: { scene: { getScene: (key: string) => unknown } } }).__rogueDefenseGame;
+    const combat = game?.scene.getScene('CombatScene') as CombatProbe | undefined;
+    combat?.replacementOverlay.show('LMG Nest', 4, [
+      { id: 'a', name: 'Auto-GL', level: 5 },
+      { id: 'b', name: 'Tesla Coil', level: 6 },
+      { id: 'c', name: 'Bolt-Action Sniper', level: 7 },
+      { id: 'd', name: 'Tac-Shotgun Bunker', level: 8 },
+    ]);
+  });
+  await expect(app).toHaveAttribute('data-overlay', 'replacement');
+  await tapLogical(page, 500, 1325);
+  await expect(app).toHaveAttribute('data-overlay', 'none');
+
+  expect(errors).toEqual([]);
+  await context.close();
 });
 
 test('PWA shell files are present in production preview', async ({ request }) => {
