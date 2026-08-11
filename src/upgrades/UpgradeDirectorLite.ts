@@ -1,9 +1,15 @@
+import {
+  RANDOM_WEAPON_DEFINITIONS,
+  RANDOM_WEAPON_IDS,
+  type RandomWeaponId,
+} from '../combat/constants';
+
 export type UpgradeId =
   | 'global-damage'
   | 'global-attack-speed'
   | 'base-max-hp'
   | 'auto-cannon-level'
-  | 'unlock-lmg';
+  | `unlock-${RandomWeaponId}`;
 
 export interface UpgradeOption {
   id: UpgradeId;
@@ -11,11 +17,12 @@ export interface UpgradeOption {
   description: string;
   rarity: 'COMMON' | 'RARE';
   weight: number;
+  weaponId?: RandomWeaponId;
 }
 
 export interface UpgradeContext {
   runLevel: number;
-  hasLmg: boolean;
+  ownedWeaponIds: readonly RandomWeaponId[];
   autoCannonLevel: number;
   globalDamageLevel: number;
   globalAttackSpeedLevel: number;
@@ -51,45 +58,69 @@ const BASE_OPTIONS: readonly UpgradeOption[] = [
     rarity: 'COMMON',
     weight: 12,
   },
-  {
-    id: 'unlock-lmg',
-    title: '轻机枪阵地',
-    description: '获得第二套独立武器系统\n600 RPM · 60 发弹匣',
-    rarity: 'RARE',
-    weight: 3,
-  },
 ];
 
+const WEAPON_DESCRIPTIONS: Record<RandomWeaponId, string> = {
+  lmg: '高频持续火力\n独立弹匣与 Reload',
+  shotgun: '近距离锥形 AOE\n越靠近命中弹丸越多',
+  sniper: '全场高伤单体\n优先最高 HP 目标',
+  'auto-gl': '延迟落点爆炸\n中距离范围伤害',
+  tesla: '短距连锁电击\n3 目标 + 轻量 Stun',
+};
+
 export class UpgradeDirectorLite {
-  private lmgOfferCount = 0;
+  private weaponOfferCount = 0;
 
   generate(context: UpgradeContext): UpgradeOption[] {
-    const eligible = BASE_OPTIONS
-      .filter((option) => this.isEligible(option.id, context))
-      .map((option) => ({
-        ...option,
-        weight: option.id === 'unlock-lmg' && context.runLevel >= 3 ? 8 : option.weight,
-      }));
-
+    const baseEligible = BASE_OPTIONS.filter((option) => this.isEligible(option.id, context));
+    const weaponOptions = this.buildWeaponOptions(context);
+    const eligible = [...baseEligible, ...weaponOptions];
     const selected: UpgradeOption[] = [];
-    const forceLmg = !context.hasLmg && context.runLevel >= 4 && this.lmgOfferCount === 0;
-    const lmg = eligible.find((option) => option.id === 'unlock-lmg');
 
-    if (forceLmg && lmg) selected.push(lmg);
+    const forceFirstWeapon = context.ownedWeaponIds.length === 0
+      && context.runLevel >= 4
+      && this.weaponOfferCount === 0;
+
+    if (forceFirstWeapon && weaponOptions.length > 0) {
+      selected.push(weaponOptions[Math.floor(Math.random() * weaponOptions.length)]);
+    }
 
     const remaining = eligible.filter((option) => !selected.some((picked) => picked.id === option.id));
+
     while (selected.length < 3 && remaining.length > 0) {
-      const picked = this.pickWeighted(remaining);
+      const alreadyHasWeaponOffer = selected.some((option) => option.weaponId !== undefined);
+      const weighted = remaining.map((option) => ({
+        ...option,
+        weight: option.weaponId && alreadyHasWeaponOffer ? option.weight * 0.35 : option.weight,
+      }));
+      const picked = this.pickWeighted(weighted);
       selected.push(picked);
       remaining.splice(remaining.findIndex((option) => option.id === picked.id), 1);
     }
 
-    if (selected.some((option) => option.id === 'unlock-lmg')) this.lmgOfferCount += 1;
+    if (selected.some((option) => option.weaponId !== undefined)) this.weaponOfferCount += 1;
     return selected;
   }
 
+  private buildWeaponOptions(context: UpgradeContext): UpgradeOption[] {
+    if (context.runLevel < 2 || context.ownedWeaponIds.length >= 4) return [];
+
+    const owned = new Set<RandomWeaponId>(context.ownedWeaponIds);
+    const weight = context.runLevel >= 3 ? 7 : 3;
+
+    return RANDOM_WEAPON_IDS
+      .filter((weaponId) => !owned.has(weaponId))
+      .map((weaponId) => ({
+        id: `unlock-${weaponId}` as UpgradeId,
+        title: RANDOM_WEAPON_DEFINITIONS[weaponId].name,
+        description: WEAPON_DESCRIPTIONS[weaponId],
+        rarity: 'RARE' as const,
+        weight,
+        weaponId,
+      }));
+  }
+
   private isEligible(id: UpgradeId, context: UpgradeContext): boolean {
-    if (id === 'unlock-lmg') return context.runLevel >= 2 && !context.hasLmg;
     if (id === 'auto-cannon-level') return context.autoCannonLevel < 10;
     if (id === 'global-damage') return context.globalDamageLevel < 10;
     if (id === 'global-attack-speed') return context.globalAttackSpeedLevel < 10;
