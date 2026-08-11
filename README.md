@@ -4,30 +4,34 @@
 
 ## 当前阶段
 
-**M0.2 — Run Progression + First Roguelite Choice**
+**M0.3 — Five-Weapon Random Pool**
 
-当前原型在 M0.1 基础上新增：
+当前原型已经具备：
 
-- 击杀自动获得 Run EXP / Credits；
-- Run Level 与连续 Pending Upgrade；
-- Level Up 时战斗完全暂停；
-- 三选一升级界面；
-- 跳过升级换取 Credits；
-- 全局伤害 +10%；
-- 全局攻速 +8%；
-- Base Max HP +12%；
-- Auto Cannon +1 Lv；
-- 第一把随机副武器 LMG Nest；
-- Auto Cannon / LMG 独立索敌、弹匣、Reload 与攻击计时；
-- Run Lv4 前后 LMG 首次展示保护。
-
-M0.1 的纵向战场、30 秒 Wave、残怪堆积、ProjectilePool、Boss Gate、1×～4×速度全部保留。
+- 1000×1600 纵向战场；
+- 敌人从顶部向下推进；
+- 30 秒固定 Wave 与残怪堆积；
+- Wave 10 Boss Gate；
+- Run EXP / Run Level / Credits；
+- Level Up 完全暂停；
+- 三选一与 Skip → Credits；
+- 全局伤害、攻速、Base Max HP、Auto Cannon Level；
+- Slot 1 固定 Auto Cannon；
+- 4 个随机武器槽；
+- 五种随机武器池：LMG、Shotgun、Sniper、Auto-GL、Tesla；
+- 第一把随机副武器展示保护；
+- Projectile / Shotgun Cone / Grenade AOE / Tesla Chain 四种基础攻击模式；
+- Frontmost / Highest HP 两种索敌规则；
+- Tesla 轻量 Stun（正式 StatusSystem 留到 M0.7）；
+- 1× / 2× / 3× / 4× 模拟速度。
 
 ## 技术栈
 
 - Phaser 4
 - TypeScript
 - Vite
+
+Web-first，玩法稳定后使用同一套代码封装 Android APK。
 
 ## 本地运行
 
@@ -57,8 +61,8 @@ npm run build
 ## 文档
 
 - [设计文档索引](docs/README.md)
-- [M0.2 设计](docs/m0.2-design.md)
-- [M0.2 验证清单](docs/m0.2-validation.md)
+- [M0.3 设计](docs/m0.3-design.md)
+- [M0.3 验证清单](docs/m0.3-validation.md)
 - [V0.2 游戏系统设计总稿](docs/game-design-v0.2.md)
 - [V0.1 升级卡池 V1](docs/upgrade-card-pool-v0.1.md)
 - [Upgrade Director V1](docs/upgrade-director-v1.md)
@@ -68,8 +72,8 @@ npm run build
 
 ```text
 M0.1  基础战斗                  ✓
-M0.2  Run EXP + 三选一 + LMG    ← 当前
-M0.3  5 种随机武器
+M0.2  Run EXP + 三选一 + LMG    ✓
+M0.3  5 种随机武器              ← 当前
 M0.4  Lv5 / Lv10 武器路线
 M0.5  Armor + 重甲
 M0.6  Air + 防空
