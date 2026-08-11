@@ -1,5 +1,5 @@
 import * as Phaser from 'phaser';
-import { BATTLEFIELD_HEIGHT, BATTLEFIELD_WIDTH } from '../combat/constants';
+import { BATTLEFIELD_WIDTH } from '../combat/constants';
 import {
   DIFFICULTIES,
   getAccountXpToNext,
