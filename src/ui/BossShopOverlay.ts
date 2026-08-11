@@ -54,6 +54,15 @@ export class BossShopOverlay {
         .setStrokeStyle(5, stroke);
 
       if (!sold) card.setInteractive({ useHandCursor: true });
+      if (!sold) {
+        card.on('pointerover', () => card.setFillStyle(0x1e293b));
+        card.on('pointerout', () => card.setFillStyle(fill));
+        card.on('pointerup', () => this.purchase(item));
+      }
+
+      // Add the card first so its text is rendered above the rectangle.
+      container.add(card);
+
       const rarity = item.rarity === 'EPIC' ? '史诗' : item.rarity === 'RARE' ? '稀有' : '普通';
       container.add(this.scene.add.text(85, y - 62, `${rarity} · ${sold ? 'SOLD' : `${item.cost} C`}`, {
         fontFamily: 'monospace', fontSize: '24px', color: sold ? '#64748b' : affordable ? '#fde68a' : '#f87171',
@@ -68,13 +77,6 @@ export class BossShopOverlay {
         wordWrap: { width: 830 },
         lineSpacing: 6,
       }));
-
-      if (!sold) {
-        card.on('pointerover', () => card.setFillStyle(0x1e293b));
-        card.on('pointerout', () => card.setFillStyle(fill));
-        card.on('pointerup', () => this.purchase(item));
-      }
-      container.add(card);
     });
 
     const refreshButton = this.scene.add.rectangle(285, 1370, 430, 110, 0x1f2937)
