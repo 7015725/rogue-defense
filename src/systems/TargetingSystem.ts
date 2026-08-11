@@ -1,4 +1,3 @@
-import * as Phaser from 'phaser';
 import type { Targetable, TargetDomain, TargetingRule } from '../combat/types';
 
 export class TargetingSystem {
@@ -23,9 +22,10 @@ export class TargetingSystem {
     targetDomains: readonly TargetDomain[],
   ): Targetable | null {
     let best: Targetable | null = null;
+    const rangeSquared = range * range;
 
     for (const target of targets) {
-      if (!this.isLegalTarget(originX, originY, range, target, targetDomains)) continue;
+      if (!this.isLegalTargetSquared(originX, originY, rangeSquared, target, targetDomains)) continue;
       if (!best || target.pathProgress > best.pathProgress) best = target;
     }
 
@@ -40,9 +40,10 @@ export class TargetingSystem {
     targetDomains: readonly TargetDomain[],
   ): Targetable | null {
     let best: Targetable | null = null;
+    const rangeSquared = range * range;
 
     for (const target of targets) {
-      if (!this.isLegalTarget(originX, originY, range, target, targetDomains)) continue;
+      if (!this.isLegalTargetSquared(originX, originY, rangeSquared, target, targetDomains)) continue;
       if (!best || target.currentHp > best.currentHp) best = target;
     }
 
@@ -58,17 +59,17 @@ export class TargetingSystem {
     targetDomains: readonly TargetDomain[] = ['GROUND', 'AIR'],
   ): Targetable | null {
     let best: Targetable | null = null;
-    let bestDistance = Number.POSITIVE_INFINITY;
+    let bestDistanceSquared = Number.POSITIVE_INFINITY;
+    const rangeSquared = range * range;
 
     for (const target of targets) {
       if (excludedIds.has(target.id)) continue;
-      if (!this.isLegalTarget(originX, originY, range, target, targetDomains)) continue;
+      if (!this.canTarget(target, targetDomains)) continue;
 
-      const distance = Phaser.Math.Distance.Between(originX, originY, target.x, target.y);
-      if (distance < bestDistance) {
-        best = target;
-        bestDistance = distance;
-      }
+      const distanceSquared = this.distanceSquared(originX, originY, target.x, target.y);
+      if (distanceSquared > rangeSquared || distanceSquared >= bestDistanceSquared) continue;
+      best = target;
+      bestDistanceSquared = distanceSquared;
     }
 
     return best;
@@ -78,14 +79,20 @@ export class TargetingSystem {
     return target.alive && targetDomains.includes(target.domain);
   }
 
-  private static isLegalTarget(
+  private static isLegalTargetSquared(
     originX: number,
     originY: number,
-    range: number,
+    rangeSquared: number,
     target: Targetable,
     targetDomains: readonly TargetDomain[],
   ): boolean {
     return this.canTarget(target, targetDomains)
-      && Phaser.Math.Distance.Between(originX, originY, target.x, target.y) <= range;
+      && this.distanceSquared(originX, originY, target.x, target.y) <= rangeSquared;
+  }
+
+  private static distanceSquared(x1: number, y1: number, x2: number, y2: number): number {
+    const dx = x2 - x1;
+    const dy = y2 - y1;
+    return dx * dx + dy * dy;
   }
 }
