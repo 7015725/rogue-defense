@@ -6,6 +6,9 @@ import type { WeaponBranchChoice, WeaponBranchStage } from '../weapons/WeaponPro
 export class WeaponBranchOverlay {
   private container: Phaser.GameObjects.Container | null = null;
   private choosing = false;
+  private weaponValue: Weapon | null = null;
+  private stageValue: WeaponBranchStage | null = null;
+  private choicesValue: WeaponBranchChoice[] = [];
 
   constructor(
     private readonly scene: Phaser.Scene,
@@ -16,9 +19,21 @@ export class WeaponBranchOverlay {
     return this.container !== null;
   }
 
+  selectIndex(index: number): boolean {
+    if (!this.visible || this.choosing || !this.weaponValue || !this.stageValue || this.choicesValue.length === 0) return false;
+    const safeIndex = Phaser.Math.Clamp(Math.floor(index), 0, this.choicesValue.length - 1);
+    const choice = this.choicesValue[safeIndex];
+    if (!choice) return false;
+    this.choose(this.weaponValue, this.stageValue, choice);
+    return true;
+  }
+
   show(weapon: Weapon, stage: WeaponBranchStage, choices: readonly WeaponBranchChoice[]): void {
     this.destroy();
     this.choosing = false;
+    this.weaponValue = weapon;
+    this.stageValue = stage;
+    this.choicesValue = [...choices];
 
     const container = this.scene.add.container(0, 0).setDepth(120);
     this.container = container;
@@ -81,6 +96,9 @@ export class WeaponBranchOverlay {
   destroy(): void {
     this.container?.destroy(true);
     this.container = null;
+    this.weaponValue = null;
+    this.stageValue = null;
+    this.choicesValue = [];
   }
 
   private choose(weapon: Weapon, stage: WeaponBranchStage, choice: WeaponBranchChoice): void {
