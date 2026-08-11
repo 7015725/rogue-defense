@@ -149,4 +149,19 @@
 - 页面改用 `100dvw/100dvh`、Safe Area Insets、`viewport-fit=cover`、`overscroll-behavior:none`、`touch-action:none`，改善 Android Chrome / iOS Safari Canvas 触控与可用视口。
 - 本阶段自动 CI 只证明类型与生产构建正确；真长局、300 Enemy + 4×、横竖屏、内存和帧时间仍必须实际运行验证。
 
-完整当前规格见 `v0.1-integration.md` 与 `v0.1-playtest-tools.md`；历史里程碑细节继续保留在对应 M0.x 文档中。
+## 2026-08-11 — V0.1 Web Release Candidate
+
+- 包版本进入 `0.1.0-rc.1`；RC 阶段不再增加核心玩法系统。
+- Web/PWA 使用原生 `manifest.webmanifest + sw.js + icon.svg`，不增加新的游戏运行时框架依赖。
+- Service Worker 只在 Production 且非 localhost 环境注册；使用 App Shell 预缓存、Navigation Network First、同源静态资源 Cache First + 后台刷新。
+- Vite 保持 `base: './'`，确保同一 `dist/` 可部署到站点根目录、GitHub Pages 子路径与未来 Android WebView/Capacitor。
+- 新增 `RuntimeProbe`：仅 Vite DEV 或 `?dev=1` 时通过 `#app.dataset` 暴露 Scene/Wave/Enemy/Projectile/DEV Run 等 E2E 状态；普通 Production URL 不暴露。
+- DEV LAUNCH 的 W100 与 Stress300 按钮间距已修正，不再发生点击区域重叠。
+- CI 在 Production Build 后临时安装固定 Playwright Chromium，新增 `ci/smoke` Gate。
+- Browser Smoke 覆盖正常 W1、永久 Save 写入、DEV W100 + Stress300、DEV Save 隔离、390×844 手机视口与 PWA Shell 文件。
+- 只有 `ci/build` 与 `ci/smoke` 都通过时，CI 才上传 `rogue-defense-v0.1-rc1-web` 的完整 `dist/` Artifact，保留 14 天。
+- GitHub Pages 工作流使用 `configure-pages@v6 + upload-pages-artifact@v5 + deploy-pages@v5`，保持 `workflow_dispatch` 手动触发。
+- 仓库继续保持 Private；不会为了 Pages 自动更改 Visibility。Private Pages 是否可用由 GitHub 账户/组织方案与仓库 Pages 设置决定。
+- RC 自动 Gate 不替代 W1→W100 真长局、300 Enemy + 4× 真机性能、Android/iOS、横屏、PWA 安装/更新和第一轮数值平衡。
+
+完整当前规格见 `v0.1-web-rc.md`、`v0.1-rc-validation.md`、`v0.1-integration.md` 与 `v0.1-playtest-tools.md`。
