@@ -68,7 +68,7 @@ jobs:
           npm run soak -- --grep "Stress300 automated" 2>&1 | tee perf.log
           EXIT_CODE=${PIPESTATUS[0]}
           echo "exit_code=$EXIT_CODE" >> "$GITHUB_OUTPUT"
-          PERF_LINE=$(grep 'RC_PERF ' perf.log | tail -n 1 | sed 's/^.*RC_PERF //' | tr -d '\r\n' | cut -c1-180)
+          PERF_LINE=$(grep '^RC_PERF ' perf.log | tail -n 1 | sed 's/^RC_PERF //' | tr -d '\r\n' | cut -c1-180)
           if [ -n "$PERF_LINE" ]; then echo "perf_line=$PERF_LINE" >> "$GITHUB_OUTPUT"; fi
           if [ "$EXIT_CODE" -ne 0 ]; then
             ERROR_LINE=$(grep -E 'Error:|Expected:|Received:|Timeout|toBeGreaterThan' perf.log | head -n 1 | tr -d '\r\n' | cut -c1-180)
