@@ -44,8 +44,13 @@ const ARMOR_LABELS: Record<ArmorGrade, string> = {
 };
 
 const STATUS_BADGE_REFRESH_MS = 150;
+const CROWD_LOD_ENABLE_COUNT = 180;
+const CROWD_LOD_DISABLE_COUNT = 140;
 
 export class Enemy implements Targetable {
+  private static readonly activeInstances = new Set<Enemy>();
+  private static crowdModeEnabled = false;
+
   readonly id = nextEnemyId++;
   readonly armorGrade: ArmorGrade;
   readonly domain: TargetDomain;
@@ -136,6 +141,10 @@ export class Enemy implements Targetable {
         padding: { x: 5, y: 2 },
       }).setOrigin(0.5)
       : null;
+
+    Enemy.activeInstances.add(this);
+    if (Enemy.crowdModeEnabled) this.setCrowdMode(true);
+    Enemy.refreshCrowdMode();
   }
 
   get x(): number { return this.shape.x; }
@@ -238,9 +247,27 @@ export class Enemy implements Targetable {
   }
 
   destroy(): void {
-    if (!this.shape.scene) return;
+    if (!this.shape.scene) {
+      Enemy.unregister(this);
+      return;
+    }
     this.dead = true;
     this.destroyVisuals();
+  }
+
+  private static refreshCrowdMode(): void {
+    const count = Enemy.activeInstances.size;
+    const next = Enemy.crowdModeEnabled
+      ? count > CROWD_LOD_DISABLE_COUNT
+      : count >= CROWD_LOD_ENABLE_COUNT;
+    if (next === Enemy.crowdModeEnabled) return;
+    Enemy.crowdModeEnabled = next;
+    for (const enemy of Enemy.activeInstances) enemy.setCrowdMode(next);
+  }
+
+  private static unregister(enemy: Enemy): void {
+    if (!Enemy.activeInstances.delete(enemy)) return;
+    Enemy.refreshCrowdMode();
   }
 
   private getDefinition(kind: EnemyKind): EnemyDefinition {
@@ -296,6 +323,7 @@ export class Enemy implements Targetable {
   }
 
   private destroyVisuals(): void {
+    Enemy.unregister(this);
     this.shape.destroy();
     this.healthBar.destroy();
     this.armorBadge?.destroy();
