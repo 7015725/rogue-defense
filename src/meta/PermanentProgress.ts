@@ -45,6 +45,7 @@ export interface RunSummary {
   kills: number;
   bossKills: number;
   reason: 'BASE_DESTROYED' | 'VOLUNTARY_EXIT' | 'TEST_COMPLETE';
+  debugRun?: boolean;
 }
 
 export interface SettlementRewards {
