@@ -118,4 +118,21 @@
 - CombatScene 在 Run 开始时读取 Permanent Save，使 Meta 起点和局内 Upgrade 正常叠加。
 - M0.9 是最后一个主要系统里程碑；后续进入 V0.1 Integration，不再优先扩新系统。
 
-完整细节见 `game-design-v0.2.md`、`m0.8-design.md`、`m0.9-design.md`。
+## 2026-08-11 — V0.1 Integration / Endless Wave
+
+- 固定 Wave1～30 测试表正式退出运行逻辑，由 `WaveDirector` 根据 Population Budget 动态生成所有普通 Wave。
+- Population Cost：Infantry 1.0、Flying 1.5、Heavy 2.5；Budget 使用 W1～10 / W11～20 / W21～50 / W51+ 四段线性曲线。
+- 每 5 Wave 且不是 Boss Wave 为 Reinforced Wave，Population Budget ×1.10；HUD 显示 `REINFORCED`。
+- 保留早期重甲身份：W6/W7/W8/W9 至少 1/2/2/3 个 Heavy；W21+ 常规 Wave 至少 1 个 Flying。
+- 所有 10 的倍数都成为 Boss Gate，不再限制到 W30；Boss 死亡后进入 Boss Shop，离店后继续下一 Wave。
+- Boss Air Escort 从 W20=6、W30=8 继续按 Checkpoint 增长，最高 20。
+- Wave HP Scaling 使用 `(1 + 0.055×(W-1)) × 1.018^(W-1)`；W100 ≈×37.69。
+- Wave Damage Scaling 使用 `(1 + 0.035×(W-1)) × 1.012^(W-1)`；W100 ≈×14.54。
+- Wave Scaling 与 Difficulty HP/Damage Multiplier 相乘；Armor 继续作为敌人身份，不随 Wave 自动成长。
+- Run EXP / Combat Credits 使用 `1 + (Wave-1)×0.01` 的击杀奖励倍率，上限 ×2.5；按当前预算粗算 W100 Run Level 约 Lv65。
+- CombatScene 取消 Wave30 自动结束，并移除 `highestWave = min(30, currentWave)`；Settlement 记录真实最高 Wave。
+- Wave100 是 Difficulty 解锁里程碑，不是 Run End；W100 Boss Shop 离店后正常进入 W101+。
+- M0.9 的 W100 解锁条件保持不变：只有当前最高已解锁 Difficulty 达 W100，结算时才解锁下一档。
+- V0.1 Integration 后续工作以真实浏览器 Playtest、平衡、UI、性能、Save/Settlement 长局回归为主，不优先扩新核心系统。
+
+完整当前规格见 `v0.1-integration.md`；历史里程碑细节继续保留在对应 M0.x 文档中。
