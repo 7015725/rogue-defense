@@ -145,27 +145,6 @@ export const LMG: WeaponDefinition = {
   color: 0xfacc15,
 };
 
-export const SHOTGUN: WeaponDefinition = {
-  id: 'shotgun',
-  name: 'Tac-Shotgun Bunker',
-  mode: 'shotgun',
-  targetingRule: 'frontmost',
-  targetDomains: ['GROUND'],
-  damage: 5,
-  attackIntervalMs: 1050,
-  range: Number.POSITIVE_INFINITY,
-  projectileSpeed: 0,
-  magazineSize: 8,
-  reloadTimeMs: 2300,
-  critChance: 0.05,
-  critMultiplier: 2,
-  maxHp: 520,
-  autoRepairPerSecond: 13,
-  color: 0xfb7185,
-  coneAngleDeg: 58,
-  pelletCount: 12,
-};
-
 export const SNIPER: WeaponDefinition = {
   id: 'sniper',
   name: 'Bolt-Action Sniper',
@@ -230,7 +209,6 @@ export const TESLA: WeaponDefinition = {
 
 export const RANDOM_WEAPON_DEFINITIONS = {
   lmg: LMG,
-  shotgun: SHOTGUN,
   sniper: SNIPER,
   'auto-gl': AUTO_GL,
   tesla: TESLA,
