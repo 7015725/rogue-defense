@@ -2,10 +2,12 @@
 
 ## 当前里程碑
 
+- [`m0.6-design.md`](m0.6-design.md)：TargetDomain、AirPath、Recon Drone、Wave 20 空中护航与防空随机保护。
+- [`m0.6-validation.md`](m0.6-validation.md)：M0.6 自动构建、目标域、防空权限、Boss Gate 与回归验证清单。
 - [`m0.5-design.md`](m0.5-design.md)：Armor Grade、Heavy Enemy、ArmorSystem、穿甲路线与 ArmorBreak 接口。
-- [`m0.5-validation.md`](m0.5-validation.md)：M0.5 自动构建、护甲公式、Heavy Wave、穿甲路线与回归验证清单。
+- [`m0.5-validation.md`](m0.5-validation.md)：M0.5 验证记录。
 - [`m0.4-design.md`](m0.4-design.md)：所有 6 把武器 Lv1～10、Lv5 α/β/γ 路线、Lv10 路线专精与 BranchEffect 实现规格。
-- [`m0.4-validation.md`](m0.4-validation.md)：M0.4 验证清单。
+- [`m0.4-validation.md`](m0.4-validation.md)：M0.4 验证记录。
 - [`m0.3-design.md`](m0.3-design.md)：五种随机武器基础形态、攻击模式、索敌规则与随机武器保底。
 - [`m0.3-validation.md`](m0.3-validation.md)：M0.3 验证清单。
 - [`m0.2-design.md`](m0.2-design.md)：Run EXP、三选一、Skip Credits 与首把 LMG 的 M0.2 实现规格。
