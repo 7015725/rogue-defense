@@ -1,0 +1,11 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" role="img" aria-label="Rogue Defense">
+  <rect width="512" height="512" rx="96" fill="#0f172a"/>
+  <path d="M96 420h320v36H96z" fill="#334155"/>
+  <path d="M176 212h160v208H176z" fill="#475569"/>
+  <path d="M144 176h224v68H144z" fill="#64748b"/>
+  <path d="M180 140h44v56h-44zm108 0h44v56h-44z" fill="#94a3b8"/>
+  <circle cx="256" cy="276" r="48" fill="#1d4ed8"/>
+  <path d="M244 76h24v148h-24z" fill="#e2e8f0"/>
+  <path d="M256 52l-24 44h48z" fill="#f8fafc"/>
+  <path d="M220 364h72v56h-72z" fill="#0f172a"/>
+</svg>
