@@ -46,7 +46,7 @@ const ARMOR_LABELS: Record<ArmorGrade, string> = {
 const STATUS_BADGE_REFRESH_MS = 150;
 const CROWD_LOD_ENABLE_COUNT = 180;
 const CROWD_LOD_DISABLE_COUNT = 140;
-const CROWD_RENDER_REFRESH_MS = 50;
+const CROWD_RENDER_REFRESH_MS = 66;
 
 export class Enemy implements Targetable {
   private static readonly activeInstances = new Set<Enemy>();
@@ -156,10 +156,11 @@ export class Enemy implements Targetable {
   update(deltaMs: number): void {
     if (this.dead) return;
 
-    this.statusEffects.update(deltaMs);
+    const hasStatusEffects = this.statusEffects.hasActiveEffects;
+    if (this.statusEffects.needsUpdate) this.statusEffects.update(deltaMs);
     if (this.dead) return;
 
-    if (!this.crowdMode) {
+    if (!this.crowdMode && hasStatusEffects) {
       this.statusBadgeRefreshMs += deltaMs;
       if (this.statusBadgeRefreshMs >= STATUS_BADGE_REFRESH_MS) {
         this.statusBadgeRefreshMs %= STATUS_BADGE_REFRESH_MS;
@@ -167,10 +168,12 @@ export class Enemy implements Targetable {
       }
     }
 
-    if (this.statusEffects.movementBlocked) return;
+    if (hasStatusEffects && this.statusEffects.movementBlocked) return;
 
     if (this.y < BASE_ATTACK_Y) {
-      const effectiveMoveSpeed = this.moveSpeed * this.statusEffects.moveSpeedMultiplier;
+      const effectiveMoveSpeed = hasStatusEffects
+        ? this.moveSpeed * this.statusEffects.moveSpeedMultiplier
+        : this.moveSpeed;
       const nextProgress = Phaser.Math.Clamp(
         (this.y + effectiveMoveSpeed * (deltaMs / 1000) - ENEMY_SPAWN_Y) / (BASE_ATTACK_Y - ENEMY_SPAWN_Y),
         0,
@@ -185,7 +188,9 @@ export class Enemy implements Targetable {
     }
 
     this.attackTimerMs += deltaMs;
-    const effectiveAttackInterval = this.attackIntervalMs / this.statusEffects.attackSpeedMultiplier;
+    const effectiveAttackInterval = hasStatusEffects
+      ? this.attackIntervalMs / this.statusEffects.attackSpeedMultiplier
+      : this.attackIntervalMs;
     while (this.attackTimerMs >= effectiveAttackInterval && this.base.alive) {
       this.attackTimerMs -= effectiveAttackInterval;
       this.base.takeDamage(this.attackDamage);
