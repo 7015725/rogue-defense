@@ -111,7 +111,7 @@ export const WEAPON_PROGRESSION: Readonly<Record<string, WeaponProgressionDefini
   },
   shotgun: {
     lv5: [
-      c('a', 'α 龙息弹', 'M0.4 先以强化近距离散射验证路线；正式 Burn 在 M0.7 接入', {
+      c('a', 'α 龙息弹', '命中附加 Burn 5s · 最多 3 层 · 刷新持续时间', {
         damageMultiplier: 1.2, coneAngleMultiplier: 1.1,
       }),
       c('b', 'β 独头弹', '改为高伤单发弹体 · 射程提高 · 获得穿甲', {
@@ -172,15 +172,15 @@ export const WEAPON_PROGRESSION: Readonly<Record<string, WeaponProgressionDefini
   },
   'auto-gl': {
     lv5: [
-      c('a', 'α 温压弹', '爆炸半径 +60% · 伤害 +15%', { aoeRadiusMultiplier: 1.6, damageMultiplier: 1.15 }),
+      c('a', 'α 温压弹', '爆炸半径 +60% · 伤害 +15% · Slow 30% / 4s', { aoeRadiusMultiplier: 1.6, damageMultiplier: 1.15 }),
       c('b', 'β 弹跳榴弹', '每发产生 3 次连续爆炸，范围略缩小', { grenadeBursts: 3, aoeRadiusMultiplier: 0.8 }),
-      c('c', 'γ 烟幕协议', 'M0.4 使用低伤大范围压制占位；正式攻速 Debuff 在 M0.7 接入', {
+      c('c', 'γ 烟幕协议', '低伤大范围压制 · 敌人攻击速度 -40% / 6s', {
         damageMultiplier: 0.35, aoeRadiusMultiplier: 1.45, attackSpeedMultiplier: 1.2,
       }),
     ],
     lv10: {
       a: [
-        c('a1', '冲击波', '爆炸附带 500ms 轻量 Stun 占位', { stunMsBonus: 500 }),
+        c('a1', '冲击波', '爆炸附带 500ms Stun', { stunMsBonus: 500 }),
         c('a2', '真空效应', '爆炸半径再 +25%', { aoeRadiusMultiplier: 1.25 }),
         c('a3', '高压起爆', '伤害 +25%', { damageMultiplier: 1.25 }),
       ],
