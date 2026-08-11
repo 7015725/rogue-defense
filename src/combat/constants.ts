@@ -60,7 +60,7 @@ export const INFANTRY: EnemyDefinition = {
   attackDamage: 11,
   attackIntervalMs: 1200,
   xp: 5,
-  credits: 2,
+  credits: 1,
   size: 42,
   color: 0x64748b,
 };
@@ -74,7 +74,7 @@ export const HEAVY: EnemyDefinition = {
   attackDamage: 20,
   attackIntervalMs: 1500,
   xp: 14,
-  credits: 6,
+  credits: 3,
   size: 58,
   color: 0x475569,
 };
@@ -88,7 +88,7 @@ export const FLYING: EnemyDefinition = {
   attackDamage: 7,
   attackIntervalMs: 800,
   xp: 7,
-  credits: 3,
+  credits: 1.5,
   size: 38,
   color: 0x38bdf8,
 };
@@ -102,7 +102,7 @@ export const BOSS: EnemyDefinition = {
   attackDamage: 32,
   attackIntervalMs: 1500,
   xp: 100,
-  credits: 100,
+  credits: 50,
   size: 92,
   color: 0xb45309,
 };
