@@ -31,6 +31,12 @@ export interface StatusSnapshot {
   tickIntervalMs: number;
 }
 
+export type ComboId =
+  | 'DETONATION'
+  | 'CONCUSSIVE_BREAK'
+  | 'OVERLOAD'
+  | 'CONTROL_EXECUTION';
+
 export type DamageTag =
   | 'PROJECTILE'
   | 'SHOTGUN'
@@ -48,6 +54,7 @@ export interface DamageContext {
   tags?: readonly DamageTag[];
   statusApplications?: readonly StatusApplication[];
   comboTargets?: readonly Targetable[];
+  enabledCombos?: readonly ComboId[];
 }
 
 export interface DamageResult {
