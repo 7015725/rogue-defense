@@ -25,4 +25,19 @@
 - Tesla 使用 3 目标连锁与临时轻量 Stun；正式 StatusEffectSystem 仍属于 M0.7。
 - 第一把随机副武器继续保留结构性展示保护，但不指定具体武器，也不会自动给予。
 
-完整细节见 `game-design-v0.2.md`、`m0.3-design.md`。
+## 2026-08-11 — M0.4 武器成长路线
+
+- Auto Cannon + 五种随机武器全部统一使用 Lv1～10。
+- 普通三选一可以升级任意已拥有且未满级的武器。
+- Lv5 达成后立即免费选择 α / β / γ，选择后本局锁定。
+- Lv10 达成后根据 Lv5 路线再免费选择 3 个专精之一，选择后本局锁定。
+- 路线选择不消耗额外 Run Upgrade，且路线 Overlay 期间战斗完全暂停。
+- Lv4→5、Lv9→10 的武器升级获得轻度权重保护，不做自动升级。
+- 武器分支数据集中在 `src/weapons/WeaponProgression.ts`，战斗层消费合并后的 `BranchEffect`。
+- BranchEffect 支持改变伤害、射速、射程、弹匣、Reload、暴击、穿甲、WeaponMode、AOE、Chain、MultiShot 等。
+- Shotgun β 独头弹会真实切换到 Projectile 模式。
+- Auto-GL β 弹跳榴弹会产生连续多次爆炸。
+- Tesla β 地面放电会真实切换到径向 AOE。
+- 龙息 Burn、烟幕 AttackSpeed Debuff 等正式状态效果继续留到 M0.7，不为 M0.4 建立第二套临时状态系统。
+
+完整细节见 `game-design-v0.2.md`、`m0.3-design.md`、`m0.4-design.md`。
