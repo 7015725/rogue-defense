@@ -1,5 +1,14 @@
 import * as Phaser from 'phaser';
-import type { DamageContext, Targetable, TargetingRule, WeaponDefinition, WeaponMode } from '../combat/types';
+import type {
+  ComboId,
+  DamageContext,
+  DamageTag,
+  StatusApplication,
+  Targetable,
+  TargetingRule,
+  WeaponDefinition,
+  WeaponMode,
+} from '../combat/types';
 import { DamageSystem } from '../systems/DamageSystem';
 import { ProjectilePool } from '../systems/ProjectilePool';
 import { TargetingSystem } from '../systems/TargetingSystem';
@@ -36,6 +45,7 @@ export class Weapon {
   private lv10SpecializationId: string | null = null;
   private focusTargetId: number | null = null;
   private focusShotCount = 0;
+  private enabledCombos: readonly ComboId[] = [];
 
   constructor(
     private readonly scene: Phaser.Scene,
@@ -87,6 +97,10 @@ export class Weapon {
   setGlobalModifiers(damageMultiplier: number, attackSpeedMultiplier: number): void {
     this.globalDamageMultiplier = Math.max(0.01, damageMultiplier);
     this.globalAttackSpeedMultiplier = Math.max(0.01, attackSpeedMultiplier);
+  }
+
+  setEnabledCombos(combos: readonly ComboId[]): void {
+    this.enabledCombos = combos;
   }
 
   upgradeLevel(): boolean {
@@ -218,13 +232,73 @@ export class Weapon {
       * focusMultiplier;
   }
 
-  private getDamageContext(baseDamage = this.getDamage()): DamageContext {
+  private getDamageContext(
+    baseDamage = this.getDamage(),
+    targets: readonly Targetable[] = [],
+  ): DamageContext {
+    const mode = this.getMode();
     return {
       baseDamage,
       critChance: Phaser.Math.Clamp(this.definition.critChance + (this.branchEffect.critChanceBonus ?? 0), 0, 1),
       critMultiplier: Math.max(1, this.definition.critMultiplier + (this.branchEffect.critMultiplierBonus ?? 0)),
       armorPenetration: Math.max(0, this.branchEffect.armorPenetrationBonus ?? 0),
+      sourceWeaponId: this.id,
+      tags: this.getDamageTags(mode),
+      statusApplications: this.getStatusApplications(mode, baseDamage),
+      comboTargets: targets,
+      enabledCombos: this.enabledCombos,
     };
+  }
+
+  private getDamageTags(mode: WeaponMode): DamageTag[] {
+    const tags: DamageTag[] = [];
+    if (mode === 'projectile') tags.push('PROJECTILE');
+    if (mode === 'shotgun') tags.push('SHOTGUN');
+    if (mode === 'grenade') tags.push('EXPLOSION');
+    if (mode === 'tesla' || mode === 'tesla-radial') tags.push('LIGHTNING');
+
+    if (this.id === 'sniper') tags.push('SNIPER', 'HEAVY_HIT');
+    if (this.id === 'shotgun' && this.lv5BranchId === 'b') tags.push('HEAVY_HIT');
+    return tags;
+  }
+
+  private getStatusApplications(mode: WeaponMode, baseDamage: number): StatusApplication[] {
+    const applications: StatusApplication[] = [];
+
+    if (this.id === 'shotgun' && this.lv5BranchId === 'a') {
+      applications.push({
+        type: 'BURN',
+        durationMs: 5000,
+        magnitude: Math.max(2, baseDamage * 0.08),
+        stacks: 1,
+        maxStacks: 3,
+        tickIntervalMs: 1000,
+        sourceWeaponId: this.id,
+      });
+    }
+
+    if (this.id === 'auto-gl') {
+      if (this.lv5BranchId === 'a') {
+        applications.push({ type: 'SLOW', durationMs: 4000, magnitude: 0.30, sourceWeaponId: this.id });
+      }
+      if (this.lv5BranchId === 'c') {
+        applications.push({ type: 'SUPPRESSED', durationMs: 6000, magnitude: 0.40, sourceWeaponId: this.id });
+      }
+      const stunMs = Math.max(0, this.branchEffect.stunMsBonus ?? 0);
+      if (stunMs > 0) {
+        applications.push({ type: 'STUN', durationMs: stunMs, sourceWeaponId: this.id });
+      }
+    }
+
+    if (this.id === 'tesla' && (mode === 'tesla' || mode === 'tesla-radial')) {
+      applications.push({ type: 'CHARGED', durationMs: 2500, sourceWeaponId: this.id });
+      const stunMs = Math.max(0, (this.definition.stunMs ?? 0) + (this.branchEffect.stunMsBonus ?? 0));
+      if (stunMs > 0) {
+        applications.push({ type: 'STUN', durationMs: stunMs, sourceWeaponId: this.id });
+      }
+    }
+
+    return applications;
   }
 
   private fire(target: Targetable, targets: readonly Targetable[]): void {
@@ -275,11 +349,11 @@ export class Weapon {
           usedIds.add(target.id);
         }
       }
-      this.fireProjectile(target);
+      this.fireProjectile(target, targets);
     }
   }
 
-  private fireProjectile(target: Targetable): void {
+  private fireProjectile(target: Targetable, targets: readonly Targetable[]): void {
     const angle = Phaser.Math.Angle.Between(this.x, this.y, target.x, target.y);
     const muzzleX = this.x + Math.cos(angle) * 78;
     const muzzleY = this.y + Math.sin(angle) * 78;
@@ -289,7 +363,7 @@ export class Weapon {
       muzzleY,
       target,
       this.getProjectileSpeed(),
-      this.getDamageContext(),
+      this.getDamageContext(this.getDamage(), targets),
     );
   }
 
@@ -317,7 +391,8 @@ export class Weapon {
       const closeness = Phaser.Math.Clamp(1 - distance / range, 0, 1);
       const hitRatio = 0.25 + 0.75 * closeness;
       const pelletsHit = Phaser.Math.Clamp(Math.round(pelletCount * hitRatio), 1, pelletCount);
-      DamageSystem.apply(candidate, this.getDamageContext(this.getDamage() * pelletsHit));
+      const baseDamage = this.getDamage() * pelletsHit;
+      DamageSystem.apply(candidate, this.getDamageContext(baseDamage, targets));
     }
 
     const graphics = this.scene.add.graphics().setDepth(4);
@@ -356,13 +431,11 @@ export class Weapon {
       if (grenade.timerMs > 0) continue;
 
       const radius = (this.definition.aoeRadius ?? 120) * (this.branchEffect.aoeRadiusMultiplier ?? 1);
-      const stunMs = Math.max(0, this.branchEffect.stunMsBonus ?? 0);
 
       for (const target of targets) {
         if (!TargetingSystem.canTarget(target, this.definition.targetDomains)) continue;
         if (Phaser.Math.Distance.Between(grenade.x, grenade.y, target.x, target.y) <= radius) {
-          DamageSystem.apply(target, this.getDamageContext());
-          if (stunMs > 0) target.applyStun(stunMs);
+          DamageSystem.apply(target, this.getDamageContext(this.getDamage(), targets));
         }
       }
 
@@ -398,7 +471,6 @@ export class Weapon {
   private fireTesla(primary: Targetable, targets: readonly Targetable[]): void {
     const chainCount = Math.max(1, (this.definition.chainCount ?? 3) + (this.branchEffect.chainCountBonus ?? 0));
     const chainRange = (this.definition.chainRange ?? 220) * (this.branchEffect.chainRangeMultiplier ?? 1);
-    const stunMs = Math.max(0, (this.definition.stunMs ?? 0) + (this.branchEffect.stunMsBonus ?? 0));
     const hitIds = new Set<number>();
     let current: Targetable | null = primary;
     let fromX = this.x;
@@ -407,8 +479,8 @@ export class Weapon {
     for (let index = 0; index < chainCount && current; index += 1) {
       const hitTarget: Targetable = current;
       hitIds.add(hitTarget.id);
-      DamageSystem.apply(hitTarget, this.getDamageContext(this.getDamage() * Math.pow(0.85, index)));
-      hitTarget.applyStun(stunMs);
+      const baseDamage = this.getDamage() * Math.pow(0.85, index);
+      DamageSystem.apply(hitTarget, this.getDamageContext(baseDamage, targets));
       this.drawTeslaArc(fromX, fromY, hitTarget.x, hitTarget.y);
 
       fromX = hitTarget.x;
@@ -426,13 +498,11 @@ export class Weapon {
 
   private fireTeslaRadial(targets: readonly Targetable[]): void {
     const range = this.getRange();
-    const stunMs = Math.max(0, (this.definition.stunMs ?? 0) + (this.branchEffect.stunMsBonus ?? 0));
 
     for (const target of targets) {
       if (!TargetingSystem.canTarget(target, this.definition.targetDomains)) continue;
       if (Phaser.Math.Distance.Between(this.x, this.y, target.x, target.y) > range) continue;
-      DamageSystem.apply(target, this.getDamageContext());
-      target.applyStun(stunMs);
+      DamageSystem.apply(target, this.getDamageContext(this.getDamage(), targets));
     }
 
     const field = this.scene.add.circle(this.x, this.y, range, this.definition.color, 0.12)
