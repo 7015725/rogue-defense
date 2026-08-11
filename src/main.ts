@@ -37,7 +37,21 @@ if (isRuntimeProbeEnabled()) {
         debugRun?: boolean;
         debugStressCount?: number;
         debugStartWave?: number;
+        runState?: { level: number; credits: number };
+        upgradeOverlay?: { visible: boolean; optionIds: readonly string[] };
+        branchOverlay?: { visible: boolean };
+        bossShopOverlay?: { visible: boolean };
+        replacementOverlay?: { visible: boolean };
       };
+      const overlay = combat.replacementOverlay?.visible
+        ? 'replacement'
+        : combat.branchOverlay?.visible
+          ? 'branch'
+          : combat.bossShopOverlay?.visible
+            ? 'shop'
+            : combat.upgradeOverlay?.visible
+              ? 'upgrade'
+              : 'none';
       publishRuntimeProbe({
         scene: 'combat',
         wave: combat.waveManager?.wave,
@@ -46,6 +60,11 @@ if (isRuntimeProbeEnabled()) {
         devRun: combat.debugRun,
         stressCount: combat.debugStressCount,
         startWave: combat.debugStartWave,
+        overlay,
+        upgradeOptionIds: combat.upgradeOverlay?.optionIds,
+        runLevel: combat.runState?.level,
+        credits: combat.runState?.credits,
+        fps: game.loop.actualFps,
       });
       return;
     }
