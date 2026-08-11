@@ -7,6 +7,7 @@ export class Base {
 
   private maxHpValue = BASE_MAX_HP;
   private hp = this.maxHpValue;
+  private damageReductionValue = 0;
   private readonly body: Phaser.GameObjects.Rectangle;
 
   constructor(private readonly scene: Phaser.Scene) {
@@ -30,9 +31,14 @@ export class Base {
     return Math.max(0, this.maxHpValue - this.hp);
   }
 
+  get damageReduction(): number {
+    return this.damageReductionValue;
+  }
+
   takeDamage(amount: number): void {
     if (!this.alive) return;
-    this.hp = Math.max(0, this.hp - amount);
+    const finalDamage = Math.max(0, amount) * (1 - this.damageReductionValue);
+    this.hp = Math.max(0, this.hp - finalDamage);
     this.scene.tweens.add({ targets: this.body, alpha: 0.45, duration: 55, yoyo: true });
   }
 
@@ -52,5 +58,10 @@ export class Base {
     const previousMax = this.maxHpValue;
     this.maxHpValue = Math.round(this.maxHpValue * multiplier);
     this.hp = Math.min(this.maxHpValue, this.hp + (this.maxHpValue - previousMax));
+  }
+
+  addDamageReduction(amount: number): void {
+    if (amount <= 0) return;
+    this.damageReductionValue = Math.min(0.40, this.damageReductionValue + amount);
   }
 }
