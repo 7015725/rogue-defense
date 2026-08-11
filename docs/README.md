@@ -4,6 +4,7 @@
 
 - [`v0.1-web-rc.md`](v0.1-web-rc.md)：PWA 包装、Browser Smoke Gate、CI Web Artifact 与 GitHub Pages 发布策略。
 - [`v0.1-rc-validation.md`](v0.1-rc-validation.md)：RC 自动 Gate、PWA、Pages、真长局、性能和设备验收清单。
+- [`v0.1-device-test.md`](v0.1-device-test.md)：同一局域网手机浏览器实机测试、Android/iOS 验收顺序与 APK 前置条件。
 - [`v0.1-integration.md`](v0.1-integration.md)：Endless Wave、Population Budget、Wave Scaling、W100 难度解锁与 W101+ 延续规则。
 - [`v0.1-playtest-tools.md`](v0.1-playtest-tools.md)：DEV 快捷 Wave、Stress 300、无存档 DEV Settlement、HUD/Status/Projectile 性能优化与移动端触控规则。
 - [`v0.1-validation.md`](v0.1-validation.md)：V0.1 Endless/W100、DEV、移动端、长局回归与性能验证清单。
@@ -25,7 +26,7 @@
 - [`m0.3-design.md`](m0.3-design.md)：五种随机武器基础形态与随机武器保护。
 - [`m0.3-validation.md`](m0.3-validation.md)：M0.3 验证记录。
 - [`m0.2-design.md`](m0.2-design.md)：Run EXP、三选一、Skip Credits 与 LMG。
-- [`m0.2-validation.md`](m0.2-validation.md)：M0.2 验证记录。
+- [`m0.2-validation.md`](m0.2-validation.md)：M0.2 自动构建与运行时验证清单。
 - [`m0.1-validation.md`](m0.1-validation.md)：M0.1 基线验证记录。
 
 ## 核心文档
