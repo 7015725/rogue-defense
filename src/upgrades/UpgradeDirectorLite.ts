@@ -124,8 +124,8 @@ export class UpgradeDirectorLite {
     const eligible = [...baseEligible, ...recoveryOptions, ...levelOptions, ...unlockOptions, ...comboOptions];
     const selected: UpgradeOption[] = [];
 
-    // Run Lv10 is the first hard new-weapon checkpoint. Rerolls at Lv10 keep this guarantee.
-    if (context.runLevel === 10 && unlockOptions.length > 0) {
+    // Run Lv5 is the first hard new-weapon checkpoint. Rerolls at Lv5 keep this guarantee.
+    if (context.runLevel === 5 && unlockOptions.length > 0) {
       selected.push(unlockOptions[Math.floor(Math.random() * unlockOptions.length)]);
     }
 
