@@ -113,7 +113,6 @@ const WEAPON_DESCRIPTIONS: Record<RandomWeaponId, string> = {
 const SECONDARY_AA_IDS = new Set<RandomWeaponId>(['lmg', 'sniper']);
 
 export class UpgradeDirectorLite {
-  private weaponOfferCount = 0;
   private antiAirOfferCount = 0;
 
   generate(context: UpgradeContext): UpgradeOption[] {
@@ -125,11 +124,19 @@ export class UpgradeDirectorLite {
     const eligible = [...baseEligible, ...recoveryOptions, ...levelOptions, ...unlockOptions, ...comboOptions];
     const selected: UpgradeOption[] = [];
 
-    // Every roll should contain one actual weapon progression choice whenever one exists.
-    // Prefer leveling an owned weapon; only fall back to a new weapon when all owned weapons are capped.
+    // Run Lv10 is the first hard new-weapon checkpoint. Rerolls at Lv10 keep this guarantee.
+    if (context.runLevel === 10 && unlockOptions.length > 0) {
+      selected.push(unlockOptions[Math.floor(Math.random() * unlockOptions.length)]);
+    }
+
+    // Every roll should contain one owned-weapon level-up whenever one exists.
+    // If every owned weapon is capped, fall back to an unowned weapon as the progression slot.
     const guaranteedWeaponPool = levelOptions.length > 0 ? levelOptions : unlockOptions;
-    if (guaranteedWeaponPool.length > 0) {
-      selected.push(guaranteedWeaponPool[Math.floor(Math.random() * guaranteedWeaponPool.length)]);
+    const guaranteedCandidates = guaranteedWeaponPool.filter(
+      (option) => !selected.some((picked) => picked.id === option.id),
+    );
+    if (guaranteedCandidates.length > 0) {
+      selected.push(guaranteedCandidates[Math.floor(Math.random() * guaranteedCandidates.length)]);
     }
 
     const hasSecondaryAa = context.ownedRandomWeaponIds.some((id) => SECONDARY_AA_IDS.has(id));
@@ -145,19 +152,8 @@ export class UpgradeDirectorLite {
       && !selectedHasAaUnlock
       && aaUnlockOptions.length > 0;
 
-    if (forceAaOffer) {
+    if (forceAaOffer && selected.length < 3) {
       selected.push(aaUnlockOptions[Math.floor(Math.random() * aaUnlockOptions.length)]);
-    }
-
-    // Delay the first-new-weapon pity from Run Lv4 to Lv7. This keeps early rolls focused on
-    // strengthening the starting cannon while still preventing a weapon-starved run.
-    const forceFirstWeapon = context.ownedRandomWeaponIds.length === 0
-      && context.runLevel >= 7
-      && this.weaponOfferCount === 0
-      && !selected.some((option) => option.kind === 'unlock-weapon');
-
-    if (forceFirstWeapon && unlockOptions.length > 0) {
-      selected.push(unlockOptions[Math.floor(Math.random() * unlockOptions.length)]);
     }
 
     const remaining = eligible.filter((option) => !selected.some((picked) => picked.id === option.id));
@@ -174,7 +170,6 @@ export class UpgradeDirectorLite {
       remaining.splice(remaining.findIndex((option) => option.id === picked.id), 1);
     }
 
-    if (selected.some((option) => option.kind === 'unlock-weapon')) this.weaponOfferCount += 1;
     if (selected.some((option) => option.weaponId && SECONDARY_AA_IDS.has(option.weaponId as RandomWeaponId))) {
       this.antiAirOfferCount += 1;
     }
