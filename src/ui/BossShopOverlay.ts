@@ -34,35 +34,39 @@ export class BossShopOverlay {
       BATTLEFIELD_WIDTH,
       BATTLEFIELD_HEIGHT,
       0x020617,
-      0.96,
+      0.97,
     ));
 
-    container.add(this.scene.add.text(BATTLEFIELD_WIDTH / 2, 105, `BOSS SHOP · WAVE ${checkpointWave}`, {
-      fontFamily: 'monospace', fontSize: '46px', color: '#f8fafc', fontStyle: 'bold',
+    container.add(this.scene.add.text(BATTLEFIELD_WIDTH / 2, 82, `BOSS SHOP · WAVE ${checkpointWave}`, {
+      fontFamily: 'monospace', fontSize: '50px', color: '#f8fafc', fontStyle: 'bold',
     }).setOrigin(0.5));
-    container.add(this.scene.add.text(BATTLEFIELD_WIDTH / 2, 165, `Credits ${credits} · 战斗完全暂停`, {
-      fontFamily: 'monospace', fontSize: '23px', color: '#94a3b8',
+    container.add(this.scene.add.text(BATTLEFIELD_WIDTH / 2, 145, `Credits ${credits} · 战斗完全暂停`, {
+      fontFamily: 'monospace', fontSize: '28px', color: '#94a3b8',
     }).setOrigin(0.5));
 
     items.forEach((item, index) => {
-      const y = 315 + index * 205;
+      const y = 270 + index * 205;
       const sold = purchasedIds.has(item.id);
       const affordable = credits >= item.cost;
       const stroke = item.rarity === 'EPIC' ? 0xc084fc : item.rarity === 'RARE' ? 0x4ade80 : 0x64748b;
       const fill = sold ? 0x111827 : 0x172033;
-      const card = this.scene.add.rectangle(BATTLEFIELD_WIDTH / 2, y, 820, 165, fill)
-        .setStrokeStyle(4, stroke);
+      const card = this.scene.add.rectangle(BATTLEFIELD_WIDTH / 2, y, 900, 175, fill)
+        .setStrokeStyle(5, stroke);
 
       if (!sold) card.setInteractive({ useHandCursor: true });
       const rarity = item.rarity === 'EPIC' ? '史诗' : item.rarity === 'RARE' ? '稀有' : '普通';
-      container.add(this.scene.add.text(125, y - 57, `${rarity} · ${sold ? 'SOLD' : `${item.cost} C`}`, {
-        fontFamily: 'monospace', fontSize: '18px', color: sold ? '#64748b' : affordable ? '#fde68a' : '#f87171',
+      container.add(this.scene.add.text(85, y - 62, `${rarity} · ${sold ? 'SOLD' : `${item.cost} C`}`, {
+        fontFamily: 'monospace', fontSize: '24px', color: sold ? '#64748b' : affordable ? '#fde68a' : '#f87171',
       }));
-      container.add(this.scene.add.text(125, y - 20, item.title, {
-        fontFamily: 'monospace', fontSize: '29px', color: sold ? '#64748b' : '#f8fafc', fontStyle: 'bold',
+      container.add(this.scene.add.text(85, y - 21, item.title, {
+        fontFamily: 'monospace', fontSize: '35px', color: sold ? '#64748b' : '#f8fafc', fontStyle: 'bold',
       }));
-      container.add(this.scene.add.text(125, y + 25, item.description, {
-        fontFamily: 'monospace', fontSize: '20px', color: sold ? '#475569' : '#cbd5e1',
+      container.add(this.scene.add.text(85, y + 30, item.description, {
+        fontFamily: 'monospace',
+        fontSize: '27px',
+        color: sold ? '#475569' : '#cbd5e1',
+        wordWrap: { width: 830 },
+        lineSpacing: 6,
       }));
 
       if (!sold) {
@@ -73,19 +77,19 @@ export class BossShopOverlay {
       container.add(card);
     });
 
-    const refreshButton = this.scene.add.rectangle(290, 1405, 410, 95, 0x1f2937)
-      .setStrokeStyle(3, credits >= refreshCost ? 0x38bdf8 : 0x7f1d1d)
+    const refreshButton = this.scene.add.rectangle(285, 1370, 430, 110, 0x1f2937)
+      .setStrokeStyle(4, credits >= refreshCost ? 0x38bdf8 : 0x7f1d1d)
       .setInteractive({ useHandCursor: true });
-    const refreshText = this.scene.add.text(290, 1405, `刷新商店 · ${refreshCost} C`, {
-      fontFamily: 'monospace', fontSize: '22px', color: credits >= refreshCost ? '#7dd3fc' : '#f87171', fontStyle: 'bold',
+    const refreshText = this.scene.add.text(285, 1370, `刷新 · ${refreshCost} C`, {
+      fontFamily: 'monospace', fontSize: '29px', color: credits >= refreshCost ? '#7dd3fc' : '#f87171', fontStyle: 'bold',
     }).setOrigin(0.5);
     refreshButton.on('pointerup', () => { if (!this.choosing) this.onRefresh(); });
 
-    const leaveButton = this.scene.add.rectangle(735, 1405, 310, 95, 0x14532d)
-      .setStrokeStyle(3, 0x4ade80)
+    const leaveButton = this.scene.add.rectangle(735, 1370, 350, 110, 0x14532d)
+      .setStrokeStyle(4, 0x4ade80)
       .setInteractive({ useHandCursor: true });
-    const leaveText = this.scene.add.text(735, 1405, '离开商店', {
-      fontFamily: 'monospace', fontSize: '24px', color: '#bbf7d0', fontStyle: 'bold',
+    const leaveText = this.scene.add.text(735, 1370, '离开商店', {
+      fontFamily: 'monospace', fontSize: '30px', color: '#bbf7d0', fontStyle: 'bold',
     }).setOrigin(0.5);
     leaveButton.on('pointerup', () => { if (!this.choosing) this.onLeave(); });
 
