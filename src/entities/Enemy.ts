@@ -28,6 +28,11 @@ export interface EnemyRewards {
   credits: number;
 }
 
+export interface EnemyDifficultyScale {
+  hpMultiplier: number;
+  damageMultiplier: number;
+}
+
 let nextEnemyId = 1;
 
 const ARMOR_LABELS: Record<ArmorGrade, string> = {
@@ -66,15 +71,16 @@ export class Enemy implements Targetable {
     readonly kind: EnemyKind,
     laneIndex: number,
     private readonly onKilled: (enemy: Enemy, rewards: EnemyRewards) => void,
+    difficultyScale: EnemyDifficultyScale = { hpMultiplier: 1, damageMultiplier: 1 },
   ) {
     const stats = this.getDefinition(kind);
-    this.maxHpValue = stats.hp;
-    this.hp = stats.hp;
+    this.maxHpValue = Math.max(1, Math.round(stats.hp * Math.max(0.01, difficultyScale.hpMultiplier)));
+    this.hp = this.maxHpValue;
     this.baseArmor = stats.armor;
     this.armorGrade = stats.armorGrade;
     this.domain = stats.domain;
     this.moveSpeed = stats.moveSpeed;
-    this.attackDamage = stats.attackDamage;
+    this.attackDamage = stats.attackDamage * Math.max(0.01, difficultyScale.damageMultiplier);
     this.attackIntervalMs = stats.attackIntervalMs;
     this.rewards = { xp: stats.xp, credits: stats.credits };
     this.statusEffects = new StatusEffectSystem(kind === 'boss', (amount) => this.takeDamage(amount));
