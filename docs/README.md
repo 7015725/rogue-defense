@@ -2,8 +2,10 @@
 
 ## 当前里程碑
 
+- [`m0.7-design.md`](m0.7-design.md)：统一 StatusEffectSystem、Boss Hard Control Resistance、首批 4 个 Combo 与三选一卡池接入。
+- [`m0.7-validation.md`](m0.7-validation.md)：M0.7 自动构建、状态行为、Combo 触发与回归验证清单。
 - [`m0.6-design.md`](m0.6-design.md)：TargetDomain、AirPath、Recon Drone、Wave 20 空中护航与防空随机保护。
-- [`m0.6-validation.md`](m0.6-validation.md)：M0.6 自动构建、目标域、防空权限、Boss Gate 与回归验证清单。
+- [`m0.6-validation.md`](m0.6-validation.md)：M0.6 验证记录。
 - [`m0.5-design.md`](m0.5-design.md)：Armor Grade、Heavy Enemy、ArmorSystem、穿甲路线与 ArmorBreak 接口。
 - [`m0.5-validation.md`](m0.5-validation.md)：M0.5 验证记录。
 - [`m0.4-design.md`](m0.4-design.md)：所有 6 把武器 Lv1～10、Lv5 α/β/γ 路线、Lv10 路线专精与 BranchEffect 实现规格。
