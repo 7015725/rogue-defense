@@ -152,14 +152,33 @@ async function measureStressFps(page: Page, wave: 1 | 50 | 100): Promise<number>
   await expect(app).toHaveAttribute('data-scene', 'combat');
   await expect.poll(async () => Number(await app.getAttribute('data-enemy-count'))).toBeGreaterThanOrEqual(300);
 
-  await page.waitForTimeout(500);
-  const samples: number[] = [];
-  for (let index = 0; index < 4; index += 1) {
-    const fps = Number(await app.getAttribute('data-fps') ?? '0');
-    if (fps > 0) samples.push(fps);
-    await page.waitForTimeout(100);
-  }
-  return samples.length === 0 ? 0 : samples.reduce((sum, value) => sum + value, 0) / samples.length;
+  return page.evaluate(() => new Promise<number>((resolve) => {
+    const frameTimes: number[] = [];
+    let previous = performance.now();
+    let finished = false;
+
+    const finish = (value: number): void => {
+      if (finished) return;
+      finished = true;
+      resolve(value);
+    };
+
+    const safety = window.setTimeout(() => finish(0), 5000);
+    const sample = (now: number): void => {
+      if (finished) return;
+      const delta = now - previous;
+      previous = now;
+      if (delta > 0 && delta < 1000) frameTimes.push(delta);
+      if (frameTimes.length >= 15) {
+        window.clearTimeout(safety);
+        const averageMs = frameTimes.reduce((sum, value) => sum + value, 0) / frameTimes.length;
+        finish(1000 / averageMs);
+        return;
+      }
+      requestAnimationFrame(sample);
+    };
+    requestAnimationFrame(sample);
+  }));
 }
 
 test('Stress300 automated Chromium baseline remains responsive at W1/W50/W100', async ({ browser }) => {
