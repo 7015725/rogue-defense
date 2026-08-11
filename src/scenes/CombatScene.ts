@@ -97,8 +97,9 @@ export class CombatScene extends Phaser.Scene {
 
     const simDelta = Math.min(delta, 50) * this.gameSpeed;
     const bossAlive = this.enemies.some((enemy) => enemy.alive && enemy.kind === 'boss');
+    const spawnRequests = this.waveManager.update(simDelta, bossAlive);
 
-    for (const request of this.waveManager.update(simDelta, bossAlive)) {
+    for (const request of spawnRequests) {
       this.enemies.push(new Enemy(
         this,
         this.base,
@@ -106,6 +107,10 @@ export class CombatScene extends Phaser.Scene {
         request.laneIndex,
         (enemy, rewards) => this.handleEnemyKilled(enemy, rewards),
       ));
+    }
+
+    if (this.waveManager.consumeCheckpointClearRequested()) {
+      this.clearRemainingEnemies();
     }
 
     for (const enemy of this.enemies) enemy.update(simDelta);
@@ -120,7 +125,7 @@ export class CombatScene extends Phaser.Scene {
     } else if (this.waveManager.isComplete) {
       this.clearRemainingEnemies();
       this.finished = true;
-      this.showFinish('M0.5 TEST COMPLETE\nHeavy armor pressure active\nPress R to restart');
+      this.showFinish('M0.6 TEST COMPLETE\nWave 20 air defense cleared\nPress R to restart');
     } else if (this.openPendingBranchChoice()) {
       // Weapon milestone choices have priority over queued Run upgrades.
     } else if (this.runState.pendingUpgrades > 0) {
@@ -139,6 +144,7 @@ export class CombatScene extends Phaser.Scene {
 
     const options = this.upgradeDirector.generate({
       runLevel: this.runState.level,
+      currentWave: this.waveManager.wave,
       ownedWeapons: this.weapons.map((weapon) => ({ id: weapon.id, name: weapon.name, level: weapon.level })),
       ownedRandomWeaponIds: [...this.randomWeapons.keys()],
       globalDamageLevel: this.globalDamageLevel,
@@ -256,12 +262,22 @@ export class CombatScene extends Phaser.Scene {
 
     this.add.rectangle(BATTLEFIELD_WIDTH / 2, ENEMY_SPAWN_Y, BATTLEFIELD_WIDTH - 80, 76, 0x172554, 0.65);
     this.add.text(44, 36, 'ENEMY SPAWN', { fontSize: '24px', color: '#93c5fd' });
+    this.add.text(BATTLEFIELD_WIDTH - 44, 36, 'AIR PATH · W20+', {
+      fontFamily: 'monospace',
+      fontSize: '20px',
+      color: '#7dd3fc',
+    }).setOrigin(1, 0);
 
     this.add.rectangle(BATTLEFIELD_WIDTH / 2, BASE_ATTACK_Y, BATTLEFIELD_WIDTH - 80, 4, 0xef4444, 0.55);
     this.add.text(44, BASE_ATTACK_Y - 38, 'BASE ATTACK LINE', { fontSize: '20px', color: '#fca5a5' });
 
     for (const offset of [-160, -80, 0, 80, 160]) {
       this.add.line(0, 0, BATTLEFIELD_WIDTH / 2 + offset, ENEMY_SPAWN_Y + 60, BATTLEFIELD_WIDTH / 2, BASE_ATTACK_Y, 0x334155, 0.28)
+        .setOrigin(0, 0);
+    }
+
+    for (const offset of [-260, 0, 260]) {
+      this.add.line(0, 0, BATTLEFIELD_WIDTH / 2 + offset, ENEMY_SPAWN_Y + 90, BATTLEFIELD_WIDTH / 2, BASE_ATTACK_Y, 0x0ea5e9, 0.12)
         .setOrigin(0, 0);
     }
   }
@@ -286,8 +302,15 @@ export class CombatScene extends Phaser.Scene {
 
   private updateUi(): void {
     const heavyCount = this.enemies.filter((enemy) => enemy.kind === 'heavy').length;
-    this.waveText.setText(`Wave ${this.waveManager.wave}${this.waveManager.isBossWave ? '  BOSS' : ''}`);
-    this.enemyText.setText(`Enemies ${this.enemies.length}${heavyCount > 0 ? ` · Heavy ${heavyCount}` : ''}`);
+    const airCount = this.enemies.filter((enemy) => enemy.domain === 'AIR').length;
+    const hasSecondaryAa = [...this.randomWeapons.keys()].some((id) => id === 'lmg' || id === 'sniper');
+
+    this.waveText.setText(`Wave ${this.waveManager.wave}${this.waveManager.isBossWave ? '  BOSS GATE' : ''}`);
+    this.enemyText.setText(
+      `Enemies ${this.enemies.length}`
+      + (heavyCount > 0 ? ` · Heavy ${heavyCount}` : '')
+      + (airCount > 0 ? ` · Air ${airCount}` : ''),
+    );
     this.runText.setText(`Run Lv ${this.runState.level}  EXP ${this.runState.xp}/${this.runState.xpToNextLevel}`);
     this.creditsText.setText(`Credits ${this.runState.credits}`);
     this.baseText.setText(`Base HP ${Math.ceil(this.base.currentHp)} / ${this.base.maxHp}`);
@@ -299,7 +322,7 @@ export class CombatScene extends Phaser.Scene {
 
     this.debugText.setText([
       `Speed ${this.gameSpeed}x${this.isChoicePaused() ? ' · PAUSED' : ''}`,
-      `Weapons ${this.weapons.length}/5`,
+      `Weapons ${this.weapons.length}/5 · Secondary AA ${hasSecondaryAa ? 'YES' : 'NO'}`,
       `Projectiles ${this.projectilePool.activeCount}`,
       `FPS ${Math.round(this.game.loop.actualFps)}`,
       `DMG ${this.globalDamageMultiplier.toFixed(2)}x · AS ${this.globalAttackSpeedMultiplier.toFixed(2)}x`,
