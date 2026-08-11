@@ -107,8 +107,7 @@ export function getAccountXpToNext(level: number): number {
   return 100 + (Math.max(1, level) - 1) * 30;
 }
 
-export function getMaxGameSpeed(save: PermanentSave): number {
-  // Temporary playtest rule: expose the full existing 1x–4x speed range regardless of meta progression.
-  const unlockedByTech = Math.min(4, 1 + Math.max(0, Math.min(3, save.tech.speedControl)));
-  return Math.max(4, unlockedByTech);
+export function getMaxGameSpeed(_save: PermanentSave): number {
+  // Temporary playtest rule: expose the full 1x/3x/5x/7x/9x range regardless of meta progression.
+  return 9;
 }
