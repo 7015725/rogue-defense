@@ -12,6 +12,11 @@ import type { Base } from './Base';
 
 export type EnemyKind = 'infantry' | 'boss';
 
+export interface EnemyRewards {
+  xp: number;
+  credits: number;
+}
+
 let nextEnemyId = 1;
 
 export class Enemy implements Targetable {
@@ -23,6 +28,7 @@ export class Enemy implements Targetable {
   private readonly moveSpeed: number;
   private readonly attackDamage: number;
   private readonly attackIntervalMs: number;
+  private readonly rewards: EnemyRewards;
   private attackTimerMs = 0;
   private readonly spawnX: number;
   private readonly shape: Phaser.GameObjects.Rectangle;
@@ -34,6 +40,7 @@ export class Enemy implements Targetable {
     private readonly base: Base,
     readonly kind: EnemyKind,
     laneIndex: number,
+    private readonly onKilled: (enemy: Enemy, rewards: EnemyRewards) => void,
   ) {
     const stats = kind === 'boss' ? BOSS : INFANTRY;
     this.maxHp = stats.hp;
@@ -42,6 +49,7 @@ export class Enemy implements Targetable {
     this.moveSpeed = stats.moveSpeed;
     this.attackDamage = stats.attackDamage;
     this.attackIntervalMs = stats.attackIntervalMs;
+    this.rewards = { xp: stats.xp, credits: stats.credits };
 
     this.spawnX = BASE_X + LANE_OFFSETS[laneIndex % LANE_OFFSETS.length];
     const size = kind === 'boss' ? 92 : 42;
@@ -90,6 +98,7 @@ export class Enemy implements Targetable {
       this.dead = true;
       this.shape.destroy();
       this.healthBar.destroy();
+      this.onKilled(this, this.rewards);
     }
   }
 
