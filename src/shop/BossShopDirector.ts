@@ -1,4 +1,7 @@
 import {
+  BASE_MAX_HP_PER_LEVEL,
+  GLOBAL_ATTACK_SPEED_PER_LEVEL,
+  GLOBAL_DAMAGE_PER_LEVEL,
   RANDOM_WEAPON_DEFINITIONS,
   RANDOM_WEAPON_IDS,
   WEAPON_LEVEL_CAP,
@@ -47,6 +50,8 @@ export interface BossShopItem {
   weaponId?: string;
   comboId?: ComboId;
 }
+
+const percent = (value: number): number => Math.round(value * 100);
 
 const COMBO_LABELS: Record<ComboId, { title: string; description: string }> = {
   DETONATION: { title: '爆燃协议', description: '需要燃烧来源 + Auto-GL：爆炸命中燃烧目标后引爆部分剩余燃烧' },
@@ -109,13 +114,34 @@ export class BossShopDirector {
     const items: BossShopItem[] = [];
 
     if (context.globalDamageLevel < 10) {
-      items.push({ id: 'shop:global-damage', kind: 'global-damage', title: '强化弹药', description: '所有武器伤害 +10%', cost: this.price(100, context.wave), rarity: 'COMMON' });
+      items.push({
+        id: 'shop:global-damage',
+        kind: 'global-damage',
+        title: '强化弹药',
+        description: `所有武器伤害 +${percent(GLOBAL_DAMAGE_PER_LEVEL)}% · 线性叠加`,
+        cost: this.price(100, context.wave),
+        rarity: 'COMMON',
+      });
     }
     if (context.globalAttackSpeedLevel < 10) {
-      items.push({ id: 'shop:global-attack-speed', kind: 'global-attack-speed', title: '快速循环', description: '所有武器攻击速度 +8%', cost: this.price(110, context.wave), rarity: 'COMMON' });
+      items.push({
+        id: 'shop:global-attack-speed',
+        kind: 'global-attack-speed',
+        title: '快速循环',
+        description: `所有武器攻击速度 +${percent(GLOBAL_ATTACK_SPEED_PER_LEVEL)}% · 线性叠加`,
+        cost: this.price(110, context.wave),
+        rarity: 'COMMON',
+      });
     }
     if (context.baseHpUpgradeLevel < 10) {
-      items.push({ id: 'shop:base-max-hp', kind: 'base-max-hp', title: '加固基地', description: 'Base MaxHP +12%，并增加等量当前 HP', cost: this.price(120, context.wave), rarity: 'COMMON' });
+      items.push({
+        id: 'shop:base-max-hp',
+        kind: 'base-max-hp',
+        title: '加固基地',
+        description: `Base MaxHP +${percent(BASE_MAX_HP_PER_LEVEL)}%，并增加等量当前 HP`,
+        cost: this.price(120, context.wave),
+        rarity: 'COMMON',
+      });
     }
 
     for (const weapon of context.weapons) {
