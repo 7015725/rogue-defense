@@ -1,4 +1,9 @@
 import * as Phaser from 'phaser';
+import {
+  WEAPON_LEVEL_ATTACK_SPEED_PER_LEVEL,
+  WEAPON_LEVEL_CAP,
+  WEAPON_LEVEL_DAMAGE_PER_LEVEL,
+} from '../combat/constants';
 import type {
   ComboId,
   DamageContext,
@@ -79,7 +84,7 @@ export class Weapon {
   }
   get currentState(): WeaponState { return this.state; }
   get level(): number { return this.levelValue; }
-  get maxLevel(): number { return 10; }
+  get maxLevel(): number { return WEAPON_LEVEL_CAP; }
   get canTargetAir(): boolean { return this.definition.targetDomains.includes('AIR'); }
   get lv5Branch(): WeaponBranchChoice | null {
     if (!this.lv5BranchId) return null;
@@ -265,14 +270,14 @@ export class Weapon {
   }
 
   private getAttackIntervalMs(): number {
-    const levelAttackSpeedMultiplier = 1 + 0.04 * (this.levelValue - 1);
+    const levelAttackSpeedMultiplier = 1 + WEAPON_LEVEL_ATTACK_SPEED_PER_LEVEL * (this.levelValue - 1);
     const branchAttackSpeedMultiplier = this.branchEffect.attackSpeedMultiplier ?? 1;
     return this.definition.attackIntervalMs
       / (levelAttackSpeedMultiplier * this.globalAttackSpeedMultiplier * branchAttackSpeedMultiplier);
   }
 
   private getDamage(): number {
-    const levelDamageMultiplier = 1 + 0.12 * (this.levelValue - 1);
+    const levelDamageMultiplier = 1 + WEAPON_LEVEL_DAMAGE_PER_LEVEL * (this.levelValue - 1);
     const branchDamageMultiplier = this.branchEffect.damageMultiplier ?? 1;
     const focusMultiplier = this.getFocusDamageMultiplier();
     return this.definition.damage
