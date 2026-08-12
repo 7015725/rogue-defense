@@ -18,9 +18,15 @@ export const WAVE20_AIR_ESCORT_COUNT = 6;
 export const WAVE30_AIR_ESCORT_COUNT = 8;
 
 export const WEAPON_LEVEL_CAP = 100;
-export const WEAPON_LEVEL_DAMAGE_PER_LEVEL = 0.03;
-export const WEAPON_LEVEL_ATTACK_SPEED_PER_LEVEL = 0.01;
+export const WEAPON_LEVEL_DAMAGE_PER_LEVEL = 0.012;
+export const WEAPON_LEVEL_ATTACK_SPEED_PER_LEVEL = 0.003;
 export const WEAPON_LEVEL_UPGRADE_POOL_WEIGHT = 6;
+
+export const GLOBAL_DAMAGE_PER_LEVEL = 0.05;
+export const GLOBAL_ATTACK_SPEED_PER_LEVEL = 0.03;
+export const BASE_MAX_HP_PER_LEVEL = 0.06;
+export const BASE_DAMAGE_REDUCTION_PER_LEVEL = 0.04;
+export const XP_GAIN_PER_LEVEL = 0.05;
 
 export const TEST_WAVE_COMPOSITIONS = [
   { infantry: 8, heavy: 0, flying: 0 },
