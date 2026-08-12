@@ -1,10 +1,15 @@
 import {
+  BASE_DAMAGE_REDUCTION_PER_LEVEL,
+  BASE_MAX_HP_PER_LEVEL,
+  GLOBAL_ATTACK_SPEED_PER_LEVEL,
+  GLOBAL_DAMAGE_PER_LEVEL,
   RANDOM_WEAPON_DEFINITIONS,
   RANDOM_WEAPON_IDS,
   WEAPON_LEVEL_ATTACK_SPEED_PER_LEVEL,
   WEAPON_LEVEL_CAP,
   WEAPON_LEVEL_DAMAGE_PER_LEVEL,
   WEAPON_LEVEL_UPGRADE_POOL_WEIGHT,
+  XP_GAIN_PER_LEVEL,
   type RandomWeaponId,
 } from '../combat/constants';
 import type { ComboId } from '../combat/types';
@@ -56,12 +61,14 @@ export interface UpgradeContext {
   baseMaxHp: number;
 }
 
+const percent = (value: number): number => Math.round(value * 100);
+
 const BASE_OPTIONS: readonly UpgradeOption[] = [
   {
     id: 'global-damage',
     kind: 'global-damage',
     title: '强化弹药',
-    description: '所有武器伤害 +10%',
+    description: `所有武器伤害 +${percent(GLOBAL_DAMAGE_PER_LEVEL)}%\n线性叠加，最多选择 10 次`,
     rarity: 'COMMON',
     weight: 10,
   },
@@ -69,7 +76,7 @@ const BASE_OPTIONS: readonly UpgradeOption[] = [
     id: 'global-attack-speed',
     kind: 'global-attack-speed',
     title: '快速循环',
-    description: '所有武器攻击速度 +8%',
+    description: `所有武器攻击速度 +${percent(GLOBAL_ATTACK_SPEED_PER_LEVEL)}%\n线性叠加，最多选择 10 次`,
     rarity: 'COMMON',
     weight: 10,
   },
@@ -77,7 +84,7 @@ const BASE_OPTIONS: readonly UpgradeOption[] = [
     id: 'base-max-hp',
     kind: 'base-max-hp',
     title: '加固基地',
-    description: '基地最大生命 +12%\n并增加等量当前生命',
+    description: `基地最大生命 +${percent(BASE_MAX_HP_PER_LEVEL)}%\n并增加等量当前生命`,
     rarity: 'COMMON',
     weight: 8,
   },
@@ -85,7 +92,7 @@ const BASE_OPTIONS: readonly UpgradeOption[] = [
     id: 'base-damage-reduction',
     kind: 'base-damage-reduction',
     title: '复合装甲',
-    description: '基地受到的伤害 -5%\n最多叠加到 30%',
+    description: `基地受到的伤害 -${percent(BASE_DAMAGE_REDUCTION_PER_LEVEL)}%\n最多选择 6 次`,
     rarity: 'COMMON',
     weight: 7,
   },
@@ -93,7 +100,7 @@ const BASE_OPTIONS: readonly UpgradeOption[] = [
     id: 'xp-gain',
     kind: 'xp-gain',
     title: '战场分析',
-    description: '后续击杀获得的局内经验 +8%\n乘算叠加，最多选择 6 次',
+    description: `后续击杀获得的局内经验 +${percent(XP_GAIN_PER_LEVEL)}%\n乘算叠加，最多选择 6 次`,
     rarity: 'RARE',
     weight: 5,
   },
