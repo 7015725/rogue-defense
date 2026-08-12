@@ -1,6 +1,7 @@
 import {
   RANDOM_WEAPON_DEFINITIONS,
   RANDOM_WEAPON_IDS,
+  WEAPON_LEVEL_CAP,
   type RandomWeaponId,
 } from '../combat/constants';
 import type { ComboId } from '../combat/types';
@@ -118,7 +119,7 @@ export class BossShopDirector {
     }
 
     for (const weapon of context.weapons) {
-      if (weapon.level >= 10) continue;
+      if (weapon.level >= WEAPON_LEVEL_CAP) continue;
       items.push({
         id: `shop:weapon-level:${weapon.id}`,
         kind: 'weapon-level',
