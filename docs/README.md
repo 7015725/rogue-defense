@@ -19,7 +19,7 @@
 - [`m0.7-design.md`](m0.7-design.md)：统一 StatusEffectSystem、Boss Hard Control Resistance、首批 4 个 Combo 与三选一卡池接入。
 - [`m0.7-validation.md`](m0.7-validation.md)：M0.7 验证记录。
 - [`m0.6-design.md`](m0.6-design.md)：TargetDomain、AirPath、Recon Drone 与防空随机保护。
-- [`m0.6-validation.md`](m0.6-validation.md)：M0.6 验收记录。
+- [`m0.6-validation.md`](m0.6-validation.md)：M0.6 验证记录。
 - [`m0.5-design.md`](m0.5-design.md)：Armor Grade、Heavy Enemy、ArmorSystem 与穿甲路线。
 - [`m0.5-validation.md`](m0.5-validation.md)：M0.5 验证记录。
 - [`m0.4-design.md`](m0.4-design.md)：6 把武器 Lv1～10、Lv5 α/β/γ 路线与 Lv10 专精。
