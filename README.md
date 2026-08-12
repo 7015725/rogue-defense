@@ -64,6 +64,26 @@ npm run build
 npm run preview
 ```
 
+### Termux / Android arm64
+
+Termux 使用专用初始化脚本处理 TypeScript 7 与 Rolldown 的 Android arm64 native package 兼容问题：
+
+```bash
+git clone https://github.com/7015725/rogue-defense.git
+cd rogue-defense
+npm run setup:termux
+npm run dev:lan
+```
+
+同一台 Android 设备浏览器：
+
+```text
+http://127.0.0.1:5173/
+http://127.0.0.1:5173/?dev=1
+```
+
+详细说明见 [`docs/TERMUX.md`](docs/TERMUX.md)。
+
 ### 手机局域网实机测试
 
 电脑和手机连接同一 Wi-Fi：
@@ -176,11 +196,12 @@ PWA 使用原生 Manifest + Service Worker，不增加运行时框架依赖。
 .github/workflows/pages.yml
 ```
 
-仓库当前保持 Private，不会为了发布测试版自动改成 Public。若当前 GitHub 方案支持 Private Pages，在 Repository Settings → Pages 将 Source 设为 GitHub Actions 后，可运行 `Deploy Web RC to GitHub Pages`。
+仓库当前为 Public。若需要 GitHub Pages，在 Repository Settings → Pages 将 Source 设为 GitHub Actions 后，可运行 `Deploy Web RC to GitHub Pages`。
 
 ## 文档
 
 - [设计文档索引](docs/README.md)
+- [Termux / Android arm64 开发环境](docs/TERMUX.md)
 - [V0.1 Web RC](docs/v0.1-web-rc.md)
 - [V0.1 RC Validation](docs/v0.1-rc-validation.md)
 - [V0.1 Real-Device Test](docs/v0.1-device-test.md)
