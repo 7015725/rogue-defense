@@ -2,6 +2,7 @@
 
 ## 当前阶段：V0.1 Web Release Candidate
 
+- [`TERMUX.md`](TERMUX.md)：Android arm64 Termux 初始化、TypeScript/Rolldown 兼容策略与本机运行方式。
 - [`v0.1-web-rc.md`](v0.1-web-rc.md)：PWA 包装、Browser Smoke Gate、CI Web Artifact 与 GitHub Pages 发布策略。
 - [`v0.1-rc-validation.md`](v0.1-rc-validation.md)：RC 自动 Gate、PWA、Pages、真长局、性能和设备验收清单。
 - [`v0.1-device-test.md`](v0.1-device-test.md)：同一局域网手机浏览器实机测试、Android/iOS 验收顺序与 APK 前置条件。
@@ -18,7 +19,7 @@
 - [`m0.7-design.md`](m0.7-design.md)：统一 StatusEffectSystem、Boss Hard Control Resistance、首批 4 个 Combo 与三选一卡池接入。
 - [`m0.7-validation.md`](m0.7-validation.md)：M0.7 验证记录。
 - [`m0.6-design.md`](m0.6-design.md)：TargetDomain、AirPath、Recon Drone 与防空随机保护。
-- [`m0.6-validation.md`](m0.6-validation.md)：M0.6 验证记录。
+- [`m0.6-validation.md`](m0.6-validation.md)：M0.6 验收记录。
 - [`m0.5-design.md`](m0.5-design.md)：Armor Grade、Heavy Enemy、ArmorSystem 与穿甲路线。
 - [`m0.5-validation.md`](m0.5-validation.md)：M0.5 验证记录。
 - [`m0.4-design.md`](m0.4-design.md)：6 把武器 Lv1～10、Lv5 α/β/γ 路线与 Lv10 专精。
