@@ -9,6 +9,7 @@
     "build": "tsc --noEmit && vite build",
     "preview": "vite preview",
     "preview:lan": "vite preview --host 0.0.0.0 --port 4173",
+    "setup:termux": "bash scripts/setup-termux.sh",
     "smoke": "playwright test",
     "soak": "playwright test --config=playwright.soak.config.ts"
   },
