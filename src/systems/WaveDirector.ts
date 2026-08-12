@@ -67,13 +67,13 @@ export class WaveDirector {
       return { hpMultiplier, damageMultiplier };
     }
 
-    // Keep the gentler early-game curve intact, then let enemy durability catch up with
-    // completed Lv10 weapon builds. Damage grows more slowly than HP to avoid sudden base one-shots.
+    // After W30, keep difficulty rising steadily without the previous sharp durability spike.
+    // Density and unit mix still add pressure, so HP and damage can grow at a gentler pace.
     const hpAtWave30 = hpAtWave20 * (1 + 0.018 * 10) * Math.pow(1.010, 10);
     const damageAtWave30 = damageAtWave20 * (1 + 0.012 * 10) * Math.pow(1.006, 10);
     const post30 = normalizedWave - 30;
-    const hpMultiplier = hpAtWave30 * (1 + 0.060 * post30) * Math.pow(1.026, post30);
-    const damageMultiplier = damageAtWave30 * (1 + 0.020 * post30) * Math.pow(1.009, post30);
+    const hpMultiplier = hpAtWave30 * (1 + 0.025 * post30) * Math.pow(1.012, post30);
+    const damageMultiplier = damageAtWave30 * (1 + 0.012 * post30) * Math.pow(1.006, post30);
 
     return {
       hpMultiplier: Math.min(1_000_000, hpMultiplier),
