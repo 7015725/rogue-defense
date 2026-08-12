@@ -17,6 +17,11 @@ export const WAVE_SPAWN_WINDOW_MS = 24_000;
 export const WAVE20_AIR_ESCORT_COUNT = 6;
 export const WAVE30_AIR_ESCORT_COUNT = 8;
 
+export const WEAPON_LEVEL_CAP = 100;
+export const WEAPON_LEVEL_DAMAGE_PER_LEVEL = 0.03;
+export const WEAPON_LEVEL_ATTACK_SPEED_PER_LEVEL = 0.01;
+export const WEAPON_LEVEL_UPGRADE_POOL_WEIGHT = 6;
+
 export const TEST_WAVE_COMPOSITIONS = [
   { infantry: 8, heavy: 0, flying: 0 },
   { infantry: 9, heavy: 0, flying: 0 },
