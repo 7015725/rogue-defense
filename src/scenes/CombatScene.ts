@@ -2,12 +2,18 @@ import * as Phaser from 'phaser';
 import {
   AUTO_CANNON,
   BASE_ATTACK_Y,
+  BASE_DAMAGE_REDUCTION_PER_LEVEL,
+  BASE_MAX_HP_PER_LEVEL,
   BATTLEFIELD_HEIGHT,
   BATTLEFIELD_WIDTH,
   ENEMY_SPAWN_Y,
+  GLOBAL_ATTACK_SPEED_PER_LEVEL,
+  GLOBAL_DAMAGE_PER_LEVEL,
   RANDOM_WEAPON_DEFINITIONS,
   RANDOM_WEAPON_SLOT_POSITIONS,
   TURRET_Y,
+  WEAPON_LEVEL_CAP,
+  XP_GAIN_PER_LEVEL,
   type RandomWeaponId,
 } from '../combat/constants';
 import type { ComboId, EnemyKind } from '../combat/types';
@@ -369,25 +375,23 @@ export class CombatScene extends Phaser.Scene {
         break;
       case 'global-damage':
         this.globalDamageLevel += 1;
-        this.globalDamageMultiplier *= 1.10;
-        this.refreshWeaponModifiers();
+        this.refreshGlobalUpgradeMultipliers();
         break;
       case 'global-attack-speed':
         this.globalAttackSpeedLevel += 1;
-        this.globalAttackSpeedMultiplier *= 1.08;
-        this.refreshWeaponModifiers();
+        this.refreshGlobalUpgradeMultipliers();
         break;
       case 'base-max-hp':
         this.baseHpUpgradeLevel += 1;
-        this.base.increaseMaxHp(1.12);
+        this.base.increaseMaxHp(1 + BASE_MAX_HP_PER_LEVEL);
         break;
       case 'base-damage-reduction':
         this.baseDamageReductionLevel += 1;
-        this.base.addDamageReduction(0.05);
+        this.base.addDamageReduction(BASE_DAMAGE_REDUCTION_PER_LEVEL);
         break;
       case 'xp-gain':
         this.xpGainLevel += 1;
-        this.runState.increaseXpGain(1.08);
+        this.runState.increaseXpGain(1 + XP_GAIN_PER_LEVEL);
         break;
       case 'reroll-charge':
         this.runState.addRerollCharges(1);
@@ -491,17 +495,15 @@ export class CombatScene extends Phaser.Scene {
         break;
       case 'global-damage':
         this.globalDamageLevel += 1;
-        this.globalDamageMultiplier *= 1.10;
-        this.refreshWeaponModifiers();
+        this.refreshGlobalUpgradeMultipliers();
         break;
       case 'global-attack-speed':
         this.globalAttackSpeedLevel += 1;
-        this.globalAttackSpeedMultiplier *= 1.08;
-        this.refreshWeaponModifiers();
+        this.refreshGlobalUpgradeMultipliers();
         break;
       case 'base-max-hp':
         this.baseHpUpgradeLevel += 1;
-        this.base.increaseMaxHp(1.12);
+        this.base.increaseMaxHp(1 + BASE_MAX_HP_PER_LEVEL);
         break;
       case 'weapon-level':
         if (item.weaponId) this.weapons.find((weapon) => weapon.id === item.weaponId)?.upgradeLevel();
@@ -526,7 +528,7 @@ export class CombatScene extends Phaser.Scene {
       case 'global-damage': return this.globalDamageLevel < 10;
       case 'global-attack-speed': return this.globalAttackSpeedLevel < 10;
       case 'base-max-hp': return this.baseHpUpgradeLevel < 10;
-      case 'weapon-level': return !!item.weaponId && !!this.weapons.find((weapon) => weapon.id === item.weaponId && weapon.level < 10);
+      case 'weapon-level': return !!item.weaponId && !!this.weapons.find((weapon) => weapon.id === item.weaponId && weapon.level < WEAPON_LEVEL_CAP);
       case 'new-weapon': return !!item.weaponId && item.weaponId in RANDOM_WEAPON_DEFINITIONS && !this.randomWeapons.has(item.weaponId as RandomWeaponId);
       case 'combo': return !!item.comboId && !this.activeCombos.has(item.comboId);
       case 'reroll-charge': return true;
@@ -579,6 +581,15 @@ export class CombatScene extends Phaser.Scene {
     const weapon = new Weapon(this, this.projectilePool, RANDOM_WEAPON_DEFINITIONS[weaponId], position.x, position.y);
     this.randomWeapons.set(weaponId, weapon);
     this.weapons.push(weapon);
+    this.refreshWeaponModifiers();
+  }
+
+  private refreshGlobalUpgradeMultipliers(): void {
+    this.globalDamageMultiplier = 1
+      + this.permanentSave.tech.damageTraining * 0.03
+      + this.globalDamageLevel * GLOBAL_DAMAGE_PER_LEVEL;
+    this.globalAttackSpeedMultiplier = 1
+      + this.globalAttackSpeedLevel * GLOBAL_ATTACK_SPEED_PER_LEVEL;
     this.refreshWeaponModifiers();
   }
 
