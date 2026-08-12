@@ -1,6 +1,10 @@
 import {
   RANDOM_WEAPON_DEFINITIONS,
   RANDOM_WEAPON_IDS,
+  WEAPON_LEVEL_ATTACK_SPEED_PER_LEVEL,
+  WEAPON_LEVEL_CAP,
+  WEAPON_LEVEL_DAMAGE_PER_LEVEL,
+  WEAPON_LEVEL_UPGRADE_POOL_WEIGHT,
   type RandomWeaponId,
 } from '../combat/constants';
 import type { ComboId } from '../combat/types';
@@ -124,21 +128,13 @@ export class UpgradeDirectorLite {
     const eligible = [...baseEligible, ...recoveryOptions, ...levelOptions, ...unlockOptions, ...comboOptions];
     const selected: UpgradeOption[] = [];
 
-    // Run Lv5 is the first hard new-weapon checkpoint. Rerolls at Lv5 keep this guarantee.
+    // Run Lv5 is the hard new-weapon checkpoint. Rerolls at Lv5 keep this guarantee.
     if (context.runLevel === 5 && unlockOptions.length > 0) {
       selected.push(unlockOptions[Math.floor(Math.random() * unlockOptions.length)]);
     }
 
-    // Every roll should contain one owned-weapon level-up whenever one exists.
-    // If every owned weapon is capped, fall back to an unowned weapon as the progression slot.
-    const guaranteedWeaponPool = levelOptions.length > 0 ? levelOptions : unlockOptions;
-    const guaranteedCandidates = guaranteedWeaponPool.filter(
-      (option) => !selected.some((picked) => picked.id === option.id),
-    );
-    if (guaranteedCandidates.length > 0) {
-      selected.push(guaranteedCandidates[Math.floor(Math.random() * guaranteedCandidates.length)]);
-    }
-
+    // Owned-weapon level-ups are deliberately not guaranteed. They stay in the weighted pool
+    // with a capped category weight so owning more weapons does not make level-up cards dominate.
     const hasSecondaryAa = context.ownedRandomWeaponIds.some((id) => SECONDARY_AA_IDS.has(id));
     const aaUnlockOptions = unlockOptions.filter(
       (option) => option.weaponId && SECONDARY_AA_IDS.has(option.weaponId as RandomWeaponId),
@@ -209,35 +205,38 @@ export class UpgradeDirectorLite {
   }
 
   private buildWeaponLevelOptions(context: UpgradeContext): UpgradeOption[] {
-    return context.ownedWeapons
-      .filter((weapon) => weapon.level < 10)
-      .map((weapon) => {
-        const milestoneBoost = weapon.level === 4 || weapon.level === 9 ? 1.15 : 1;
-        const nextLevel = weapon.level + 1;
-        const damageBefore = 1 + 0.12 * (weapon.level - 1);
-        const damageAfter = 1 + 0.12 * weapon.level;
-        const attackSpeedBefore = 1 + 0.04 * (weapon.level - 1);
-        const attackSpeedAfter = 1 + 0.04 * weapon.level;
-        const milestone = nextLevel === 5
-          ? '\n达到 Lv5 后立即选择 α / β / γ 路线'
-          : nextLevel === 10
-            ? '\n达到 Lv10 后立即选择路线专精'
+    const eligibleWeapons = context.ownedWeapons.filter((weapon) => weapon.level < WEAPON_LEVEL_CAP);
+    const perWeaponWeight = WEAPON_LEVEL_UPGRADE_POOL_WEIGHT / Math.max(1, eligibleWeapons.length);
+
+    return eligibleWeapons.map((weapon) => {
+      const milestoneBoost = weapon.level === 4 || weapon.level === 9 ? 1.15 : 1;
+      const nextLevel = weapon.level + 1;
+      const damageBefore = 1 + WEAPON_LEVEL_DAMAGE_PER_LEVEL * (weapon.level - 1);
+      const damageAfter = 1 + WEAPON_LEVEL_DAMAGE_PER_LEVEL * weapon.level;
+      const attackSpeedBefore = 1 + WEAPON_LEVEL_ATTACK_SPEED_PER_LEVEL * (weapon.level - 1);
+      const attackSpeedAfter = 1 + WEAPON_LEVEL_ATTACK_SPEED_PER_LEVEL * weapon.level;
+      const milestone = nextLevel === 5
+        ? '\n达到 Lv5 后立即选择 α / β / γ 路线'
+        : nextLevel === 10
+          ? '\n达到 Lv10 后立即选择路线专精'
+          : nextLevel === WEAPON_LEVEL_CAP
+            ? '\n达到当前武器等级上限'
             : '';
 
-        return {
-          id: `weapon-level:${weapon.id}`,
-          kind: 'weapon-level' as const,
-          title: `${weapon.name} +1 Lv`,
-          description: [
-            `Lv${weapon.level} → Lv${nextLevel}`,
-            `伤害系数 ${damageBefore.toFixed(2)}× → ${damageAfter.toFixed(2)}×`,
-            `攻速系数 ${attackSpeedBefore.toFixed(2)}× → ${attackSpeedAfter.toFixed(2)}×${milestone}`,
-          ].join('\n'),
-          rarity: 'COMMON' as const,
-          weight: 12 * milestoneBoost,
-          weaponId: weapon.id,
-        };
-      });
+      return {
+        id: `weapon-level:${weapon.id}`,
+        kind: 'weapon-level' as const,
+        title: `${weapon.name} +1 Lv`,
+        description: [
+          `Lv${weapon.level} → Lv${nextLevel}`,
+          `伤害系数 ${damageBefore.toFixed(2)}× → ${damageAfter.toFixed(2)}×`,
+          `攻速系数 ${attackSpeedBefore.toFixed(2)}× → ${attackSpeedAfter.toFixed(2)}×${milestone}`,
+        ].join('\n'),
+        rarity: 'COMMON' as const,
+        weight: perWeaponWeight * milestoneBoost,
+        weaponId: weapon.id,
+      };
+    });
   }
 
   private buildWeaponUnlockOptions(context: UpgradeContext): UpgradeOption[] {
