@@ -7,7 +7,6 @@ import {
   type PermanentSave,
 } from '../meta/PermanentProgress';
 import { SaveService } from '../meta/SaveService';
-import { TECH_DEFINITIONS, TechTree } from '../meta/TechTree';
 
 const DEV_WAVE_PRESETS = [1, 10, 20, 50, 80, 100] as const;
 
@@ -119,46 +118,15 @@ export class MainMenuScene extends Phaser.Scene {
       });
     });
 
-    this.root.add(this.add.text(54, 790, '局外科技', {
-      fontFamily: 'monospace', fontSize: '32px', color: '#f8fafc', fontStyle: 'bold',
-    }));
-
-    TECH_DEFINITIONS.forEach((definition, index) => {
-      const level = TechTree.getLevel(this.save, definition.id);
-      const maxed = level >= definition.maxLevel;
-      const cost = maxed ? 0 : definition.costForNextLevel(level);
-      const y = 870 + index * 112;
-      const currency = definition.currency === 'GOLD' ? 'Gold' : 'TP';
-      const canAfford = maxed || (definition.currency === 'GOLD' ? this.save.gold >= cost : this.save.techPoints >= cost);
-
-      const card = this.add.rectangle(BATTLEFIELD_WIDTH / 2, y, 900, 94, 0x172033)
-        .setStrokeStyle(3, maxed ? 0x22c55e : canAfford ? 0x64748b : 0x334155);
-      if (!maxed && canAfford) {
-        card.setInteractive({ useHandCursor: true });
-        card.on('pointerup', () => {
-          if (TechTree.buy(this.save, definition.id)) {
-            SaveService.save(this.save);
-            this.render();
-          }
-        });
-      }
-      this.root.add(card);
-      this.root.add(this.add.text(78, y - 28, `${definition.name}  Lv${level}/${definition.maxLevel}`, {
-        fontFamily: 'monospace', fontSize: '22px', color: '#f8fafc', fontStyle: 'bold',
-      }));
-      this.root.add(this.add.text(78, y + 8, definition.description, {
-        fontFamily: 'monospace', fontSize: '17px', color: '#cbd5e1',
-      }));
-      this.root.add(this.add.text(900, y, maxed ? 'MAX' : `${cost} ${currency}`, {
-        fontFamily: 'monospace', fontSize: '20px', color: maxed ? '#86efac' : canAfford ? '#fcd34d' : '#64748b',
-      }).setOrigin(1, 0.5));
-    });
-
-    this.addButton(BATTLEFIELD_WIDTH / 2, 1470, 450, 72, '免费重置全部科技', 0x3f3f46, () => {
-      TechTree.resetAll(this.save);
+    this.addButton(BATTLEFIELD_WIDTH / 2, 835, 620, 88, '局外科技 · 蜂窝科技树', 0x172554, () => {
       SaveService.save(this.save);
-      this.render();
+      this.scene.start('TechTreeScene');
     });
+
+    this.root.add(this.add.text(BATTLEFIELD_WIDTH / 2, 908,
+      `金币 ${this.save.gold} · 科技点 ${this.save.techPoints} · 点击进入独立科技页面`,
+      { fontFamily: 'monospace', fontSize: '18px', color: '#94a3b8' },
+    ).setOrigin(0.5));
   }
 
   private renderDevLaunchPanel(): void {

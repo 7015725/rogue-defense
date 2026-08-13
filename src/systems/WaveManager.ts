@@ -2,6 +2,7 @@ import {
   WAVE_DURATION_MS,
   WAVE_SPAWN_WINDOW_MS,
 } from '../combat/constants';
+import { AIR_ENEMIES_ENABLED } from '../combat/features';
 import type { EnemyKind } from '../combat/types';
 import { WaveDirector, type WaveComposition } from './WaveDirector';
 
@@ -158,7 +159,9 @@ export class WaveManager {
 
       for (let index = 0; index < escortCount; index += 1) {
         const laneIndex = this.pickLane(random, previousLane);
-        requests.push({ kind: 'flying', laneIndex });
+        // Flying escorts are temporarily replaced by ground infantry while the
+        // air-enemy feature is disabled. The escort pressure and boss cadence remain.
+        requests.push({ kind: AIR_ENEMIES_ENABLED ? 'flying' : 'infantry', laneIndex });
         previousLane = laneIndex;
       }
       return requests;

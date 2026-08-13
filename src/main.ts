@@ -5,6 +5,7 @@ import { isRuntimeProbeEnabled, publishRuntimeProbe } from './dev/RuntimeProbe';
 import { CombatScene } from './scenes/CombatScene';
 import { MainMenuScene } from './scenes/MainMenuScene';
 import { SettlementScene } from './scenes/SettlementScene';
+import { TechTreeScene } from './scenes/TechTreeScene';
 import { installChineseLocalization } from './ui/ChineseLocalization';
 import { installCombatMobileLayout } from './ui/CombatMobileLayout';
 
@@ -23,7 +24,7 @@ const config: Phaser.Types.Core.GameConfig = {
     mode: Phaser.Scale.EXPAND,
     autoCenter: Phaser.Scale.NO_CENTER,
   },
-  scene: [MainMenuScene, CombatScene, SettlementScene],
+  scene: [MainMenuScene, TechTreeScene, CombatScene, SettlementScene],
 };
 
 const game = new Phaser.Game(config);
@@ -81,7 +82,7 @@ if (isRuntimeProbeEnabled()) {
     if (active.scene.key === 'SettlementScene') {
       publishRuntimeProbe({ scene: 'settlement' });
     }
-    // MainMenuScene publishes its own detailed startWave/stress state on every render.
+    // MainMenuScene and TechTreeScene publish their own state on render.
   }, 100);
 }
 

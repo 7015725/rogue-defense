@@ -1,4 +1,5 @@
 import type { EnemyKind } from '../combat/types';
+import { AIR_ENEMIES_ENABLED } from '../combat/features';
 
 export interface WaveComposition {
   readonly infantry: number;
@@ -34,14 +35,16 @@ export class WaveDirector {
     const heavyRatio = normalizedWave < 8
       ? 0
       : Math.min(0.30, 0.06 + (normalizedWave - 8) * 0.0018 + lateWave * 0.0010);
-    const flyingRatio = normalizedWave <= 20
-      ? 0
-      : Math.min(0.21, 0.055 + (normalizedWave - 21) * 0.0014 + lateWave * 0.0008);
+    const flyingRatio = AIR_ENEMIES_ENABLED && normalizedWave > 20
+      ? Math.min(0.21, 0.055 + (normalizedWave - 21) * 0.0014 + lateWave * 0.0008)
+      : 0;
 
     const ratioHeavy = Math.max(0, Math.floor((populationBudget * heavyRatio) / POPULATION_COST.heavy));
     const ratioFlying = Math.max(0, Math.floor((populationBudget * flyingRatio) / POPULATION_COST.flying));
     const heavy = Math.max(ratioHeavy, this.getMinimumHeavyCount(normalizedWave));
-    const flying = Math.max(ratioFlying, this.getMinimumFlyingCount(normalizedWave));
+    const flying = AIR_ENEMIES_ENABLED
+      ? Math.max(ratioFlying, this.getMinimumFlyingCount(normalizedWave))
+      : 0;
     const spent = heavy * POPULATION_COST.heavy + flying * POPULATION_COST.flying;
     const infantry = Math.max(1, Math.floor((populationBudget - spent) / POPULATION_COST.infantry));
 

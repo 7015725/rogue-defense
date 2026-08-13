@@ -1,5 +1,5 @@
 export interface RuntimeProbeState {
-  scene: 'menu' | 'combat' | 'settlement';
+  scene: 'menu' | 'tech-tree' | 'combat' | 'settlement';
   wave?: number;
   enemyCount?: number;
   projectileCount?: number;
