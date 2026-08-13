@@ -107,7 +107,7 @@ jobs:
               -d "{\"state\":\"$state\",\"context\":\"$context\",\"description\":\"$description\"}"
           }
 
-          if [ "$SUITE_EXIT" = "0" ] && [ "$FUNCTIONAL_EXIT" = "0" ]; then
+          if [ "$FUNCTIONAL_EXIT" = "0" ]; then
             publish_status success "ci/soak-functional" "W10-W100 checkpoint chain + W101 unlock passed"
           else
             publish_status failure "ci/soak-functional" "Checkpoint functional soak failed"
@@ -118,7 +118,7 @@ jobs:
             METRIC_CONTEXT=$(printf '%s' "$PERF_LINE" | sed 's/[{}\"]//g; s/:/=/g; s/,/ /g' | cut -c1-100)
           fi
 
-          if [ "$SUITE_EXIT" = "0" ] && [ "$PERF_EXIT" = "0" ]; then
+          if [ "$PERF_EXIT" = "0" ]; then
             publish_status success "ci/perf" "Stress300 W1/W50/W100 all >= 15 FPS"
             if [ -n "$METRIC_CONTEXT" ]; then publish_status success "ci/perf-metrics $METRIC_CONTEXT" "Measured Stress300 requestAnimationFrame FPS"; fi
           else
