@@ -20,6 +20,9 @@ const POPULATION_COST: Readonly<Record<Exclude<EnemyKind, 'boss'>, number>> = {
   flying: 1.5,
 };
 
+const WAVE20_BOSS_HP_SCALE = 0.78;
+const WAVE30_BOSS_HP_SCALE = 0.90;
+
 let activeSpawnWave = 1;
 
 export class WaveDirector {
@@ -56,8 +59,12 @@ export class WaveDirector {
 
     if (normalizedWave <= 20) {
       const index = normalizedWave - 1;
-      const hpMultiplier = (1 + 0.032 * index) * Math.pow(1.009, index);
+      let hpMultiplier = (1 + 0.032 * index) * Math.pow(1.009, index);
       const damageMultiplier = (1 + 0.018 * index) * Math.pow(1.005, index);
+      // W20 is the first true Boss encounter. Its wave contains only the Boss,
+      // so applying the encounter scale here softens the first wall without
+      // weakening W19 or the normal W21+ progression curve.
+      if (normalizedWave === 20) hpMultiplier *= WAVE20_BOSS_HP_SCALE;
       return { hpMultiplier, damageMultiplier };
     }
 
@@ -67,8 +74,11 @@ export class WaveDirector {
 
     if (normalizedWave <= 30) {
       const post20 = normalizedWave - 20;
-      const hpMultiplier = hpAtWave20 * (1 + 0.018 * post20) * Math.pow(1.010, post20);
+      let hpMultiplier = hpAtWave20 * (1 + 0.018 * post20) * Math.pow(1.010, post20);
       const damageMultiplier = damageAtWave20 * (1 + 0.012 * post20) * Math.pow(1.006, post20);
+      // W30 is the second Boss lesson: closer to full strength, but still below
+      // the W40+ baseline. The underlying post-W20 curve remains unchanged.
+      if (normalizedWave === 30) hpMultiplier *= WAVE30_BOSS_HP_SCALE;
       return { hpMultiplier, damageMultiplier };
     }
 
@@ -94,8 +104,11 @@ export class WaveDirector {
   static getBossEscortCount(wave: number): number {
     const normalizedWave = Math.max(1, Math.floor(wave));
     if (normalizedWave < 20) return 0;
-    const checkpoint = Math.floor(normalizedWave / 10);
-    return Math.min(12, 2 + checkpoint);
+    if (normalizedWave === 20) return 0;
+    if (normalizedWave === 30) return 2;
+    // W40 establishes the full Boss pattern. Add one escort per checkpoint from
+    // there instead of dropping four escorts on the player's first Boss fight.
+    return Math.min(10, 4 + Math.max(0, Math.floor((normalizedWave - 40) / 10)));
   }
 
   static setActiveSpawnWave(wave: number): void {

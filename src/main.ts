@@ -6,6 +6,7 @@ import { CombatScene } from './scenes/CombatScene';
 import { MainMenuScene } from './scenes/MainMenuScene';
 import { SettlementScene } from './scenes/SettlementScene';
 import { TechTreeScene } from './scenes/TechTreeScene';
+import { installBossCombatTelemetry } from './ui/BossCombatTelemetry';
 import { installChineseLocalization } from './ui/ChineseLocalization';
 import { installCombatMobileLayout } from './ui/CombatMobileLayout';
 
@@ -30,6 +31,7 @@ const config: Phaser.Types.Core.GameConfig = {
 const game = new Phaser.Game(config);
 installChineseLocalization(game);
 installCombatMobileLayout(game);
+installBossCombatTelemetry(game);
 
 if (isRuntimeProbeEnabled()) {
   const devWindow = window as Window & { __rogueDefenseGame?: Phaser.Game };

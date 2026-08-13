@@ -83,6 +83,18 @@ export class SettlementScene extends Phaser.Scene {
       this.addMetricCell(300 + column * 410, 330 + row * 88, 380, 76, label, value);
     });
 
+    if (telemetry.bossWave > 0 && telemetry.bossMaxHp > 0) {
+      const remainingPercent = Math.round((telemetry.bossRemainingHp / telemetry.bossMaxHp) * 100);
+      const actualDps = telemetry.bossActualDps > 0 ? Math.round(telemetry.bossActualDps).toString() : '—';
+      this.add.text(BATTLEFIELD_WIDTH / 2, 758,
+        `W${telemetry.bossWave} 首领分析 · 剩余 ${remainingPercent}% · 承受伤害 ${Math.round(telemetry.bossDamageDealt)} · 实战 DPS ${actualDps}`,
+        {
+          fontFamily: 'monospace', fontSize: '18px', color: '#fbbf24', align: 'center',
+          backgroundColor: '#451a0355', padding: { x: 12, y: 6 },
+        },
+      ).setOrigin(0.5);
+    }
+
     this.add.rectangle(500, 925, 860, 190, 0x111827, 0.76)
       .setStrokeStyle(2, 0x334155, 0.95);
     this.add.text(100, 850, '永久成长', {
