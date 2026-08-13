@@ -68,7 +68,7 @@ test('normal W1 run starts and settlement persists permanent progress', async ({
   const saveBefore = await page.evaluate(() => localStorage.getItem('rogue-defense.save'));
   expect(saveBefore).not.toBeNull();
 
-  await clickLogical(page, 865, 250);
+  await clickLogical(page, 922, 111);
   await expect(app).toHaveAttribute('data-scene', 'settlement');
 
   const saveAfter = await page.evaluate(() => localStorage.getItem('rogue-defense.save'));
@@ -105,7 +105,7 @@ test('DEV W100 + Stress 300 reaches combat and does not persist settlement', asy
   const saveBeforeSettlement = await page.evaluate(() => localStorage.getItem('rogue-defense.save'));
   expect(saveBeforeSettlement).not.toBeNull();
 
-  await clickLogical(page, 865, 250);
+  await clickLogical(page, 922, 111);
   await expect(app).toHaveAttribute('data-scene', 'settlement');
 
   const saveAfterSettlement = await page.evaluate(() => localStorage.getItem('rogue-defense.save'));
