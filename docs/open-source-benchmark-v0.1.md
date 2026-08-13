@@ -81,10 +81,10 @@ Rogue Defense 当前已经具备 Lv5 路线与 Lv10 专精，因此本轮不重�
 |---|---|---|
 | 普通 Wave | 常规 Population Budget | 稳定资源与 EXP |
 | W5 / W15 / ... | Elite / Reinforced | 中段压力检查 |
-| W10 / W30? | Gate / Shop Checkpoint | 经济整理和 Build 调整 |
-| W20 起每 10 Wave | Boss Gate | 真正 Boss 与关键长局压力 |
+| W10 | Gate / Shop Checkpoint | 经济整理和 Build 调整 |
+| W20 起每 10 Wave | Boss Gate + Shop | 真正 Boss 与关键长局压力 |
 
-注：W10 本身是 Shop Checkpoint；W20、W30、W40... 同时属于 Boss/Checkpoint，由 Boss 击杀触发商店。
+注：W10 本身是普通 Shop Checkpoint；W20、W30、W40... 同时属于 Boss/Checkpoint，由 Boss 击杀触发商店。
 
 ### W5 Elite 调整
 
