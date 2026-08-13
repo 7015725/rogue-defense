@@ -1,4 +1,9 @@
 import * as Phaser from 'phaser';
+import {
+  recordEarlyWaveAdvance,
+  resetRunTelemetry,
+  updateRunTelemetry,
+} from '../run/RunTelemetry';
 
 interface WeaponHudProbe {
   name: string;
@@ -25,6 +30,7 @@ interface SpeedButtonProbe {
 }
 
 interface CombatHudProbe {
+  difficultyId?: number;
   waveManager?: {
     wave: number;
     isBossWave: boolean;
@@ -36,8 +42,18 @@ interface CombatHudProbe {
     advanceEarly: (activeEnemyCount: number) => number;
   };
   runState?: {
+    level: number;
+    xp: number;
+    xpToNextLevel: number;
+    xpGainMultiplier: number;
     credits: number;
+    rerollCharges: number;
     addCredits: (amount: number) => void;
+  };
+  base?: {
+    currentHp: number;
+    maxHp: number;
+    damageReduction: number;
   };
   enemies?: Array<{ kind?: string; domain?: string }>;
   projectilePool?: { activeCount: number; size: number };
@@ -54,13 +70,21 @@ interface CombatHudProbe {
   setGameSpeed?: (speed: number) => void;
   updateUi?: () => void;
   isChoicePaused?: () => boolean;
+  finishRun?: (reason: 'VOLUNTARY_EXIT') => void;
 }
 
-const COMPACT_HUD_REFRESH_MS = 250;
-const BOTTOM_PANEL_RIGHT = 970;
-const BOTTOM_PANEL_LEFT = 30;
-const BOTTOM_PANEL_BOTTOM = 1355;
+const HUD_REFRESH_MS = 250;
 const PLAYTEST_SPEEDS = [1, 3, 5, 7, 9] as const;
+const TOP_PANEL_WIDTH = 964;
+const TOP_PANEL_HEIGHT = 300;
+const TOP_PANEL_CENTER_Y = 168;
+const ACTION_Y = 250;
+const BOTTOM_PANEL_WIDTH = 964;
+const BOTTOM_PANEL_HEIGHT = 188;
+const BOTTOM_PANEL_CENTER_Y = 1185;
+const WEAPON_CARD_GAP = 8;
+const WEAPON_CARD_AREA_WIDTH = 920;
+const MAX_WEAPON_CARDS = 5;
 
 function findText(scene: Phaser.Scene, predicate: (value: string) => boolean): Phaser.GameObjects.Text | null {
   for (const child of scene.children.list) {
@@ -70,11 +94,79 @@ function findText(scene: Phaser.Scene, predicate: (value: string) => boolean): P
   return null;
 }
 
-function hideBattlefieldLabels(scene: Phaser.Scene): void {
+function hideLegacyHud(scene: Phaser.Scene): void {
+  const hiddenPrefixes = ['Difficulty ', 'Enemies ', 'Run Lv ', 'Credits ', 'Base HP ', 'S1 '];
   for (const child of scene.children.list) {
-    if (!(child instanceof Phaser.GameObjects.Text)) continue;
-    if (child.text === 'AIR PATH · W20+' || child.text === 'BASE ATTACK LINE') child.setVisible(false);
+    if (child instanceof Phaser.GameObjects.Text) {
+      const shouldHide = hiddenPrefixes.some((prefix) => child.text.startsWith(prefix))
+        || child.text === 'ENEMY SPAWN'
+        || child.text === 'AIR PATH · W20+'
+        || child.text === 'BASE ATTACK LINE'
+        || child.text === '结束本局 [E]'
+        || (child.text.includes('Speed ') && child.text.includes('Projectiles '));
+      if (shouldHide) child.disableInteractive().setVisible(false);
+      continue;
+    }
+
+    if (
+      child instanceof Phaser.GameObjects.Rectangle
+      && Math.abs(child.x - 870) < 2
+      && Math.abs(child.y - 330) < 2
+    ) {
+      child.disableInteractive().setVisible(false);
+    }
   }
+}
+
+function getDifficultyLabel(id: number): string {
+  return ['I', 'II', 'III', 'IV', 'V'][Math.max(0, Math.min(4, Math.floor(id) - 1))] ?? 'I';
+}
+
+function installTopStatus(scene: Phaser.Scene): void {
+  const combat = scene as unknown as CombatHudProbe;
+
+  scene.add.rectangle(500, TOP_PANEL_CENTER_Y, TOP_PANEL_WIDTH, TOP_PANEL_HEIGHT, 0x020617, 0.94)
+    .setStrokeStyle(2, 0x334155, 0.95)
+    .setDepth(14);
+  scene.add.rectangle(500, 165, 918, 2, 0x334155, 0.75).setDepth(15);
+
+  const primaryLeft = scene.add.text(42, 48, '', {
+    fontFamily: 'monospace', fontSize: '27px', color: '#f8fafc', fontStyle: 'bold',
+  }).setDepth(16);
+  const primaryRight = scene.add.text(958, 48, '', {
+    fontFamily: 'monospace', fontSize: '23px', color: '#cbd5e1', align: 'right',
+  }).setOrigin(1, 0).setDepth(16);
+  const secondaryLeft = scene.add.text(42, 101, '', {
+    fontFamily: 'monospace', fontSize: '21px', color: '#cbd5e1',
+  }).setDepth(16);
+  const secondaryRight = scene.add.text(958, 101, '', {
+    fontFamily: 'monospace', fontSize: '21px', color: '#cbd5e1', align: 'right',
+  }).setOrigin(1, 0).setDepth(16);
+
+  const update = (): void => {
+    const manager = combat.waveManager;
+    const run = combat.runState;
+    if (!manager || !run) return;
+
+    const enemies = combat.enemies ?? [];
+    const heavyCount = enemies.filter((enemy) => enemy.kind === 'heavy').length;
+    const airCount = enemies.filter((enemy) => enemy.domain === 'AIR').length;
+    const waveKind = manager.isBossWave
+      ? 'BOSS'
+      : manager.isCheckpointWave
+        ? '关卡'
+        : manager.isReinforcedWave
+          ? '精英'
+          : '普通';
+
+    primaryLeft.setText(`难度 ${getDifficultyLabel(combat.difficultyId ?? 1)} · W${manager.wave} · ${waveKind}`);
+    primaryRight.setText(`敌人 ${enemies.length}${heavyCount > 0 ? ` · 重甲 ${heavyCount}` : ''}${airCount > 0 ? ` · 空中 ${airCount}` : ''}`);
+    secondaryLeft.setText(`局内 Lv${run.level} · EXP ${run.xp}/${run.xpToNextLevel} · XP×${run.xpGainMultiplier.toFixed(2)}`);
+    secondaryRight.setText(`战斗币 ${run.credits} · 重抽 ${run.rerollCharges}`);
+  };
+
+  update();
+  scene.time.addEvent({ delay: HUD_REFRESH_MS, loop: true, callback: update });
 }
 
 function installPlaytestSpeedControls(scene: Phaser.Scene): void {
@@ -86,16 +178,13 @@ function installPlaytestSpeedControls(scene: Phaser.Scene): void {
   }
 
   const controls = PLAYTEST_SPEEDS.map((speed, index) => {
-    const x = 64 + index * 82;
-    const button = scene.add.rectangle(x, 330, 70, 58, 0x1f2937)
+    const x = 55 + index * 70;
+    const button = scene.add.rectangle(x, ACTION_Y, 60, 56, 0x1f2937)
       .setStrokeStyle(2, 0x64748b)
       .setInteractive({ useHandCursor: true })
       .setDepth(16);
-    const text = scene.add.text(x, 330, `${speed}×`, {
-      fontFamily: 'monospace',
-      fontSize: '20px',
-      color: '#e2e8f0',
-      fontStyle: 'bold',
+    const text = scene.add.text(x, ACTION_Y, `${speed}×`, {
+      fontFamily: 'monospace', fontSize: '18px', color: '#e2e8f0', fontStyle: 'bold',
     }).setOrigin(0.5).setDepth(17);
 
     const select = (): void => {
@@ -110,11 +199,13 @@ function installPlaytestSpeedControls(scene: Phaser.Scene): void {
 
   const refresh = (): void => {
     const activeSpeed = combat.gameSpeed ?? 1;
+    const maxSpeed = combat.maxGameSpeed ?? 1;
     for (const item of controls) {
+      const locked = item.speed > maxSpeed;
       const active = item.speed === activeSpeed;
-      item.button.setFillStyle(active ? 0x1d4ed8 : 0x1f2937);
-      item.button.setStrokeStyle(2, active ? 0x93c5fd : 0x64748b);
-      item.text.setColor(active ? '#eff6ff' : '#e2e8f0');
+      item.button.setFillStyle(active ? 0x1d4ed8 : locked ? 0x0f172a : 0x1f2937);
+      item.button.setStrokeStyle(2, active ? 0x93c5fd : locked ? 0x334155 : 0x64748b);
+      item.text.setColor(locked ? '#475569' : active ? '#eff6ff' : '#e2e8f0');
     }
   };
 
@@ -126,22 +217,18 @@ function installPlaytestSpeedControls(scene: Phaser.Scene): void {
   keyboard?.on('keydown-NINE', () => { combat.setGameSpeed?.(9); refresh(); });
 
   refresh();
-  scene.time.addEvent({ delay: COMPACT_HUD_REFRESH_MS, loop: true, callback: refresh });
+  scene.time.addEvent({ delay: HUD_REFRESH_MS, loop: true, callback: refresh });
 }
 
 function installEarlyWaveControl(scene: Phaser.Scene): void {
   const combat = scene as unknown as CombatHudProbe;
-  const x = 600;
-  const y = 330;
-  const button = scene.add.rectangle(x, y, 300, 58, 0x1f2937)
-    .setStrokeStyle(2, 0x475569)
+  const x = 560;
+  const button = scene.add.rectangle(x, ACTION_Y, 350, 56, 0x111827)
+    .setStrokeStyle(2, 0x334155)
     .setInteractive({ useHandCursor: true })
     .setDepth(16);
-  const text = scene.add.text(x, y, '出怪完成后可提前', {
-    fontFamily: 'monospace',
-    fontSize: '18px',
-    color: '#64748b',
-    fontStyle: 'bold',
+  const text = scene.add.text(x, ACTION_Y, '出怪完成后可提前', {
+    fontFamily: 'monospace', fontSize: '18px', color: '#64748b', fontStyle: 'bold',
   }).setOrigin(0.5).setDepth(17);
 
   const trigger = (): void => {
@@ -151,6 +238,7 @@ function installEarlyWaveControl(scene: Phaser.Scene): void {
     const bonus = manager.advanceEarly(combat.enemies?.length ?? 0);
     if (bonus <= 0) return;
     combat.runState?.addCredits(bonus);
+    recordEarlyWaveAdvance(bonus);
     combat.updateUi?.();
     refresh();
   };
@@ -180,7 +268,23 @@ function installEarlyWaveControl(scene: Phaser.Scene): void {
   scene.input.keyboard?.on('keydown-N', trigger);
 
   refresh();
-  scene.time.addEvent({ delay: COMPACT_HUD_REFRESH_MS, loop: true, callback: refresh });
+  scene.time.addEvent({ delay: HUD_REFRESH_MS, loop: true, callback: refresh });
+}
+
+function installEndControl(scene: Phaser.Scene): void {
+  const combat = scene as unknown as CombatHudProbe;
+  const x = 865;
+  const button = scene.add.rectangle(x, ACTION_Y, 190, 56, 0x334155)
+    .setStrokeStyle(2, 0x64748b)
+    .setInteractive({ useHandCursor: true })
+    .setDepth(16);
+  const text = scene.add.text(x, ACTION_Y, '结束本局 [E]', {
+    fontFamily: 'monospace', fontSize: '17px', color: '#e2e8f0', fontStyle: 'bold',
+  }).setOrigin(0.5).setDepth(17);
+
+  const trigger = (): void => combat.finishRun?.('VOLUNTARY_EXIT');
+  button.on('pointerup', trigger);
+  text.setInteractive({ useHandCursor: true }).on('pointerup', trigger);
 }
 
 function estimateSustainedDps(weapon: WeaponHudProbe): number | null {
@@ -201,71 +305,125 @@ function estimateSustainedDps(weapon: WeaponHudProbe): number | null {
   return expectedDamage * magazineSize * (1000 / cycleMs);
 }
 
+function compactWeaponName(name: string, maxLength: number): string {
+  return name.length <= maxLength ? name : `${name.slice(0, Math.max(1, maxLength - 1))}…`;
+}
+
 function installBottomHud(scene: Phaser.Scene): void {
-  const baseText = findText(scene, (text) => text.startsWith('Base HP'));
+  const combat = scene as unknown as CombatHudProbe;
+  const sourceBaseText = findText(scene, (text) => text.startsWith('Base HP'));
   const sourceWeaponText = findText(scene, (text) => text.startsWith('S1 '));
-  if (!baseText || !sourceWeaponText) return;
+  sourceBaseText?.setVisible(false);
+  sourceWeaponText?.setVisible(false);
 
-  sourceWeaponText.setVisible(false);
-
-  const panel = scene.add.rectangle(500, 1300, BOTTOM_PANEL_RIGHT - BOTTOM_PANEL_LEFT, 100, 0x020617, 0.78)
-    .setStrokeStyle(2, 0x334155, 0.9)
+  scene.add.rectangle(500, BOTTOM_PANEL_CENTER_Y, BOTTOM_PANEL_WIDTH, BOTTOM_PANEL_HEIGHT, 0x020617, 0.91)
+    .setStrokeStyle(2, 0x334155, 0.95)
     .setDepth(14);
 
-  baseText
-    .setFontSize(24)
-    .setColor('#f8fafc')
-    .setDepth(15);
+  const baseLabel = scene.add.text(42, 1105, '', {
+    fontFamily: 'monospace', fontSize: '20px', color: '#f8fafc', fontStyle: 'bold',
+  }).setDepth(16);
+  const loadoutLabel = scene.add.text(958, 1105, '', {
+    fontFamily: 'monospace', fontSize: '18px', color: '#94a3b8', align: 'right',
+  }).setOrigin(1, 0).setDepth(16);
 
-  const compactWeaponText = scene.add.text(BOTTOM_PANEL_LEFT + 12, 1300, '', {
-    fontFamily: 'monospace',
-    fontSize: '20px',
-    color: '#cbd5e1',
-    lineSpacing: 4,
-  }).setDepth(15);
+  const hpBarX = 42;
+  const hpBarY = 1140;
+  const hpBarWidth = 916;
+  scene.add.rectangle(hpBarX, hpBarY, hpBarWidth, 12, 0x0f172a)
+    .setOrigin(0, 0.5)
+    .setStrokeStyle(1, 0x475569)
+    .setDepth(15);
+  const hpFill = scene.add.rectangle(hpBarX, hpBarY, hpBarWidth, 8, 0x94a3b8)
+    .setOrigin(0, 0.5)
+    .setDepth(16);
+
+  const cards = Array.from({ length: MAX_WEAPON_CARDS }, () => {
+    const box = scene.add.rectangle(0, 1210, 180, 82, 0x111827, 0.95)
+      .setStrokeStyle(2, 0x334155)
+      .setDepth(15)
+      .setVisible(false);
+    const text = scene.add.text(0, 1210, '', {
+      fontFamily: 'monospace', fontSize: '15px', color: '#cbd5e1', align: 'center', lineSpacing: 2,
+    }).setOrigin(0.5).setDepth(16).setVisible(false);
+    return { box, text };
+  });
 
   const update = (): void => {
-    const combat = scene as unknown as CombatHudProbe;
     const weapons = combat.weapons ?? [];
-    const weaponCount = Math.max(1, weapons.length);
-    const panelHeight = Math.min(192, 72 + weaponCount * 24);
-    const panelTop = BOTTOM_PANEL_BOTTOM - panelHeight;
+    const weaponCount = Math.min(MAX_WEAPON_CARDS, weapons.length);
+    const base = combat.base;
+    if (base) {
+      const ratio = Phaser.Math.Clamp(base.currentHp / Math.max(1, base.maxHp), 0, 1);
+      baseLabel.setText(`基地 ${Math.ceil(base.currentHp)} / ${base.maxHp} · 减伤 ${Math.round(base.damageReduction * 100)}%`);
+      hpFill.setDisplaySize(Math.max(1, hpBarWidth * ratio), 8);
+    }
+    loadoutLabel.setText(`武器 ${weapons.length}/5 · 协同 ${combat.activeCombos?.size ?? 0}`);
 
-    panel
-      .setPosition(500, panelTop + panelHeight / 2)
-      .setSize(BOTTOM_PANEL_RIGHT - BOTTOM_PANEL_LEFT, panelHeight)
-      .setDisplaySize(BOTTOM_PANEL_RIGHT - BOTTOM_PANEL_LEFT, panelHeight);
+    const cardWidth = weaponCount > 0
+      ? (WEAPON_CARD_AREA_WIDTH - WEAPON_CARD_GAP * (weaponCount - 1)) / weaponCount
+      : WEAPON_CARD_AREA_WIDTH;
+    const startX = 500 - (cardWidth * weaponCount + WEAPON_CARD_GAP * Math.max(0, weaponCount - 1)) / 2 + cardWidth / 2;
+    const fontSize = weaponCount >= 5 ? 14 : weaponCount === 4 ? 15 : 17;
+    let totalDps = 0;
 
-    baseText.setPosition(BOTTOM_PANEL_LEFT + 12, panelTop + 12);
-    compactWeaponText
-      .setPosition(BOTTOM_PANEL_LEFT + 12, panelTop + 48)
-      .setText(weapons.map((weapon, index) => {
-        const aa = weapon.canTargetAir ? ' AA' : '';
-        const dps = estimateSustainedDps(weapon);
-        const dpsLabel = dps === null ? '—' : Math.round(dps).toString();
-        return `S${index + 1} ${weapon.name} L${weapon.level}${aa} · DPS≈${dpsLabel} · HP ${Math.ceil(weapon.currentHp)}/${weapon.maxHp} · A ${weapon.ammoLabel} · ${weapon.currentState}`;
-      }));
+    cards.forEach((card, index) => {
+      const weapon = weapons[index];
+      if (!weapon) {
+        card.box.setVisible(false);
+        card.text.setVisible(false);
+        return;
+      }
+
+      const dps = estimateSustainedDps(weapon);
+      if (dps !== null) totalDps += dps;
+      const x = startX + index * (cardWidth + WEAPON_CARD_GAP);
+      const maxNameLength = weaponCount >= 5 ? 9 : weaponCount === 4 ? 11 : 15;
+      const aa = weapon.canTargetAir ? ' · AA' : '';
+      const dpsLabel = dps === null ? '—' : Math.round(dps).toString();
+
+      card.box
+        .setPosition(x, 1210)
+        .setDisplaySize(cardWidth, 82)
+        .setStrokeStyle(2, weapon.currentHp / Math.max(1, weapon.maxHp) < 0.35 ? 0xf97316 : 0x334155)
+        .setVisible(true);
+      card.text
+        .setPosition(x, 1210)
+        .setFontSize(fontSize)
+        .setText([
+          `S${index + 1} ${compactWeaponName(weapon.name, maxNameLength)} L${weapon.level}${aa}`,
+          `DPS≈${dpsLabel} · 弹 ${weapon.ammoLabel}`,
+          `HP ${Math.ceil(weapon.currentHp)}/${weapon.maxHp} · ${weapon.currentState}`,
+        ])
+        .setVisible(true);
+    });
+
+    updateRunTelemetry({
+      weaponLoadout: weapons.map((weapon) => `${weapon.name} L${weapon.level}`),
+      comboCount: combat.activeCombos?.size ?? 0,
+      estimatedDps: totalDps,
+    });
   };
 
   update();
-  scene.time.addEvent({ delay: COMPACT_HUD_REFRESH_MS, loop: true, callback: update });
+  scene.time.addEvent({ delay: HUD_REFRESH_MS, loop: true, callback: update });
 }
 
 function installCompactDebug(scene: Phaser.Scene): void {
-  const source = findText(scene, (text) => text.includes('Speed ') && text.includes('Projectiles '));
-  source?.setVisible(false);
+  const combat = scene as unknown as CombatHudProbe;
+  const explicitDevHud = new URLSearchParams(window.location.search).get('dev') === '1';
+  if (!explicitDevHud && !combat.debugRun) return;
 
-  const compact = scene.add.text(962, 390, '', {
+  const compact = scene.add.text(962, 330, '', {
     fontFamily: 'monospace',
-    fontSize: '18px',
+    fontSize: '16px',
     color: '#e2e8f0',
     align: 'right',
     backgroundColor: '#020617d9',
-    padding: { x: 9, y: 7 },
+    padding: { x: 8, y: 6 },
   }).setOrigin(1, 0).setDepth(15);
 
   const update = (): void => {
-    const combat = scene as unknown as CombatHudProbe;
     const wave = combat.waveManager?.wave ?? 1;
     const enemyCount = combat.enemies?.length ?? 0;
     const heavyCount = combat.enemies?.filter((enemy) => enemy.kind === 'heavy').length ?? 0;
@@ -279,25 +437,27 @@ function installCompactDebug(scene: Phaser.Scene): void {
           : `B${combat.waveManager?.populationBudget ?? 0}`;
     const devLabel = combat.debugRun
       ? `DEV W${combat.debugStartWave ?? wave}${(combat.debugStressCount ?? 0) > 0 ? ` +${combat.debugStressCount}` : ''}`
-      : null;
+      : 'DEV HUD';
 
     compact.setText([
-      `FPS ${Math.round(scene.game.loop.actualFps)} · ${combat.gameSpeed ?? 1}×/${combat.maxGameSpeed ?? 1}×`,
+      `${devLabel} · FPS ${Math.round(scene.game.loop.actualFps)}`,
       `W${wave} ${waveKind} · E${enemyCount} H${heavyCount} A${airCount}`,
-      `WPN ${combat.weapons?.length ?? 0}/5 · P${combat.projectilePool?.activeCount ?? 0}/${combat.projectilePool?.size ?? 0} · C${combat.activeCombos?.size ?? 0}/4`,
-      `K${combat.kills ?? 0} · B${combat.bossKills ?? 0}`,
-      devLabel,
-    ].filter((line): line is string => line !== null));
+      `WPN ${combat.weapons?.length ?? 0}/5 · P${combat.projectilePool?.activeCount ?? 0}/${combat.projectilePool?.size ?? 0}`,
+      `K${combat.kills ?? 0} · B${combat.bossKills ?? 0} · C${combat.activeCombos?.size ?? 0}`,
+    ]);
   };
 
   update();
-  scene.time.addEvent({ delay: COMPACT_HUD_REFRESH_MS, loop: true, callback: update });
+  scene.time.addEvent({ delay: HUD_REFRESH_MS, loop: true, callback: update });
 }
 
 function applyCombatMobileLayout(scene: Phaser.Scene): void {
-  hideBattlefieldLabels(scene);
+  resetRunTelemetry();
+  hideLegacyHud(scene);
+  installTopStatus(scene);
   installPlaytestSpeedControls(scene);
   installEarlyWaveControl(scene);
+  installEndControl(scene);
   installBottomHud(scene);
   installCompactDebug(scene);
 }
