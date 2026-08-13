@@ -129,6 +129,10 @@ const EARLY_WEAPON_PITY = [
   { runLevel: 8, minimumRandomWeapons: 4 },
 ] as const;
 const EMERGENCY_BASE_HEAL_THRESHOLD = 0.45;
+const UPGRADE_CHOICE_COUNT = 5;
+const MAX_WEAPON_LEVEL_OPTIONS = 2;
+const MAX_UNLOCK_OPTIONS = 1;
+const MAX_COMBO_OPTIONS = 1;
 
 export class UpgradeDirectorLite {
   private antiAirOfferCount = 0;
@@ -142,27 +146,20 @@ export class UpgradeDirectorLite {
     const eligible = [...baseEligible, ...recoveryOptions, ...levelOptions, ...unlockOptions, ...comboOptions];
     const selected: UpgradeOption[] = [];
 
-    // Early runs should not end purely because all level-up rolls missed new weapons.
-    // The pity only guarantees an offer: the player can still reject it, and it will
-    // remain eligible on later level-ups until the minimum loadout checkpoint is met.
     const minimumRandomWeapons = this.getMinimumRandomWeaponsForLevel(context.runLevel);
     if (context.ownedRandomWeaponIds.length < minimumRandomWeapons && unlockOptions.length > 0) {
       selected.push(unlockOptions[Math.floor(Math.random() * unlockOptions.length)]);
     }
 
-    // Once the base is critically damaged, keep one recovery route visible so a leak
-    // does not become an unavoidable death spiral through pure card RNG.
     const emergencyHeal = recoveryOptions.find((option) => option.kind === 'base-heal');
     if (
       emergencyHeal
       && context.baseCurrentHp <= context.baseMaxHp * EMERGENCY_BASE_HEAL_THRESHOLD
-      && selected.length < 3
+      && selected.length < UPGRADE_CHOICE_COUNT
     ) {
       selected.push(emergencyHeal);
     }
 
-    // Owned-weapon level-ups are deliberately not guaranteed. They stay in the weighted pool
-    // with a capped category weight so owning more weapons does not make level-up cards dominate.
     const hasSecondaryAa = context.ownedRandomWeaponIds.some((id) => SECONDARY_AA_IDS.has(id));
     const aaUnlockOptions = unlockOptions.filter(
       (option) => option.weaponId && SECONDARY_AA_IDS.has(option.weaponId as RandomWeaponId),
@@ -170,24 +167,27 @@ export class UpgradeDirectorLite {
     const selectedHasAaUnlock = selected.some(
       (option) => option.weaponId && SECONDARY_AA_IDS.has(option.weaponId as RandomWeaponId),
     );
+    const selectedHasUnlock = selected.some((option) => option.kind === 'unlock-weapon');
     const forceAaOffer = context.currentWave >= 18
       && !hasSecondaryAa
       && this.antiAirOfferCount === 0
       && !selectedHasAaUnlock
+      && !selectedHasUnlock
       && aaUnlockOptions.length > 0;
 
-    if (forceAaOffer && selected.length < 3) {
+    if (forceAaOffer && selected.length < UPGRADE_CHOICE_COUNT) {
       selected.push(aaUnlockOptions[Math.floor(Math.random() * aaUnlockOptions.length)]);
     }
 
     const remaining = eligible.filter((option) => !selected.some((picked) => picked.id === option.id));
 
-    while (selected.length < 3 && remaining.length > 0) {
-      const alreadyHasWeaponCategory = selected.some((option) => this.isWeaponCategory(option));
-      const alreadyHasCombo = selected.some((option) => option.kind === 'combo');
-      const weighted = remaining.map((option) => ({
+    while (selected.length < UPGRADE_CHOICE_COUNT && remaining.length > 0) {
+      const available = remaining.filter((option) => this.canAddOption(option, selected));
+      if (available.length === 0) break;
+
+      const weighted = available.map((option) => ({
         ...option,
-        weight: this.getDiversityWeight(option, alreadyHasWeaponCategory, alreadyHasCombo),
+        weight: this.getDiversityWeight(option, selected),
       }));
       const picked = this.pickWeighted(weighted);
       selected.push(picked);
@@ -355,18 +355,26 @@ export class UpgradeDirectorLite {
     return true;
   }
 
-  private isWeaponCategory(option: UpgradeOption): boolean {
-    return option.kind === 'weapon-level' || option.kind === 'unlock-weapon';
+  private canAddOption(option: UpgradeOption, selected: readonly UpgradeOption[]): boolean {
+    if (
+      option.kind === 'weapon-level'
+      && selected.filter((picked) => picked.kind === 'weapon-level').length >= MAX_WEAPON_LEVEL_OPTIONS
+    ) return false;
+    if (
+      option.kind === 'unlock-weapon'
+      && selected.filter((picked) => picked.kind === 'unlock-weapon').length >= MAX_UNLOCK_OPTIONS
+    ) return false;
+    if (
+      option.kind === 'combo'
+      && selected.filter((picked) => picked.kind === 'combo').length >= MAX_COMBO_OPTIONS
+    ) return false;
+    return true;
   }
 
-  private getDiversityWeight(
-    option: UpgradeOption,
-    alreadyHasWeaponCategory: boolean,
-    alreadyHasCombo: boolean,
-  ): number {
-    if (option.kind === 'unlock-weapon' && alreadyHasWeaponCategory) return option.weight * 0.20;
-    if (this.isWeaponCategory(option) && alreadyHasWeaponCategory) return option.weight * 0.35;
-    if (option.kind === 'combo' && alreadyHasCombo) return option.weight * 0.35;
+  private getDiversityWeight(option: UpgradeOption, selected: readonly UpgradeOption[]): number {
+    if (option.kind === 'weapon-level' && selected.some((picked) => picked.kind === 'weapon-level')) {
+      return option.weight * 0.60;
+    }
     return option.weight;
   }
 
