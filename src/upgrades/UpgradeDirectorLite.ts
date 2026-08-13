@@ -122,6 +122,13 @@ const WEAPON_DESCRIPTIONS: Record<RandomWeaponId, string> = {
 };
 
 const SECONDARY_AA_IDS = new Set<RandomWeaponId>(['lmg', 'sniper']);
+const EARLY_WEAPON_PITY = [
+  { runLevel: 2, minimumRandomWeapons: 1 },
+  { runLevel: 4, minimumRandomWeapons: 2 },
+  { runLevel: 5, minimumRandomWeapons: 3 },
+  { runLevel: 8, minimumRandomWeapons: 4 },
+] as const;
+const EMERGENCY_BASE_HEAL_THRESHOLD = 0.45;
 
 export class UpgradeDirectorLite {
   private antiAirOfferCount = 0;
@@ -135,9 +142,23 @@ export class UpgradeDirectorLite {
     const eligible = [...baseEligible, ...recoveryOptions, ...levelOptions, ...unlockOptions, ...comboOptions];
     const selected: UpgradeOption[] = [];
 
-    // Run Lv5 is the hard new-weapon checkpoint. Rerolls at Lv5 keep this guarantee.
-    if (context.runLevel === 5 && unlockOptions.length > 0) {
+    // Early runs should not end purely because all level-up rolls missed new weapons.
+    // The pity only guarantees an offer: the player can still reject it, and it will
+    // remain eligible on later level-ups until the minimum loadout checkpoint is met.
+    const minimumRandomWeapons = this.getMinimumRandomWeaponsForLevel(context.runLevel);
+    if (context.ownedRandomWeaponIds.length < minimumRandomWeapons && unlockOptions.length > 0) {
       selected.push(unlockOptions[Math.floor(Math.random() * unlockOptions.length)]);
+    }
+
+    // Once the base is critically damaged, keep one recovery route visible so a leak
+    // does not become an unavoidable death spiral through pure card RNG.
+    const emergencyHeal = recoveryOptions.find((option) => option.kind === 'base-heal');
+    if (
+      emergencyHeal
+      && context.baseCurrentHp <= context.baseMaxHp * EMERGENCY_BASE_HEAL_THRESHOLD
+      && selected.length < 3
+    ) {
+      selected.push(emergencyHeal);
     }
 
     // Owned-weapon level-ups are deliberately not guaranteed. They stay in the weighted pool
@@ -315,6 +336,14 @@ export class UpgradeDirectorLite {
     }
 
     return options;
+  }
+
+  private getMinimumRandomWeaponsForLevel(runLevel: number): number {
+    let minimum = 0;
+    for (const checkpoint of EARLY_WEAPON_PITY) {
+      if (runLevel >= checkpoint.runLevel) minimum = checkpoint.minimumRandomWeapons;
+    }
+    return minimum;
   }
 
   private isBaseEligible(kind: UpgradeKind, context: UpgradeContext): boolean {
