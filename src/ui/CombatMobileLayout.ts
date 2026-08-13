@@ -8,6 +8,14 @@ interface WeaponHudProbe {
   ammoLabel: string;
   currentState: string;
   canTargetAir: boolean;
+  magazineSize: number;
+  definition?: {
+    critChance: number;
+    critMultiplier: number;
+    reloadTimeMs: number;
+  };
+  getDamage?: () => number;
+  getAttackIntervalMs?: () => number;
 }
 
 interface SpeedButtonProbe {
@@ -20,8 +28,16 @@ interface CombatHudProbe {
   waveManager?: {
     wave: number;
     isBossWave: boolean;
+    isCheckpointWave: boolean;
     isReinforcedWave: boolean;
     populationBudget: number;
+    canAdvanceEarly: boolean;
+    getEarlyAdvanceBonus: (activeEnemyCount: number) => number;
+    advanceEarly: (activeEnemyCount: number) => number;
+  };
+  runState?: {
+    credits: number;
+    addCredits: (amount: number) => void;
   };
   enemies?: Array<{ kind?: string; domain?: string }>;
   projectilePool?: { activeCount: number; size: number };
@@ -37,6 +53,7 @@ interface CombatHudProbe {
   debugStressCount?: number;
   setGameSpeed?: (speed: number) => void;
   updateUi?: () => void;
+  isChoicePaused?: () => boolean;
 }
 
 const COMPACT_HUD_REFRESH_MS = 250;
@@ -112,6 +129,78 @@ function installPlaytestSpeedControls(scene: Phaser.Scene): void {
   scene.time.addEvent({ delay: COMPACT_HUD_REFRESH_MS, loop: true, callback: refresh });
 }
 
+function installEarlyWaveControl(scene: Phaser.Scene): void {
+  const combat = scene as unknown as CombatHudProbe;
+  const x = 600;
+  const y = 330;
+  const button = scene.add.rectangle(x, y, 300, 58, 0x1f2937)
+    .setStrokeStyle(2, 0x475569)
+    .setInteractive({ useHandCursor: true })
+    .setDepth(16);
+  const text = scene.add.text(x, y, '出怪完成后可提前', {
+    fontFamily: 'monospace',
+    fontSize: '18px',
+    color: '#64748b',
+    fontStyle: 'bold',
+  }).setOrigin(0.5).setDepth(17);
+
+  const trigger = (): void => {
+    if (combat.isChoicePaused?.()) return;
+    const manager = combat.waveManager;
+    if (!manager?.canAdvanceEarly) return;
+    const bonus = manager.advanceEarly(combat.enemies?.length ?? 0);
+    if (bonus <= 0) return;
+    combat.runState?.addCredits(bonus);
+    combat.updateUi?.();
+    refresh();
+  };
+
+  const refresh = (): void => {
+    const manager = combat.waveManager;
+    if (!manager) return;
+    const enemyCount = combat.enemies?.length ?? 0;
+    const available = manager.canAdvanceEarly;
+    const bonus = available ? manager.getEarlyAdvanceBonus(enemyCount) : 0;
+
+    if (available) {
+      button.setFillStyle(0x78350f).setStrokeStyle(2, 0xf59e0b);
+      text.setColor('#fde68a').setText(`提前 W${manager.wave + 1} · +${bonus}C [N]`);
+      return;
+    }
+
+    button.setFillStyle(0x111827).setStrokeStyle(2, 0x334155);
+    text.setColor('#64748b');
+    if (manager.isBossWave) text.setText('BOSS 波不可提前');
+    else if (manager.isCheckpointWave) text.setText(`W${manager.wave} 关卡结算`);
+    else text.setText('出怪完成后可提前');
+  };
+
+  button.on('pointerup', trigger);
+  text.setInteractive({ useHandCursor: true }).on('pointerup', trigger);
+  scene.input.keyboard?.on('keydown-N', trigger);
+
+  refresh();
+  scene.time.addEvent({ delay: COMPACT_HUD_REFRESH_MS, loop: true, callback: refresh });
+}
+
+function estimateSustainedDps(weapon: WeaponHudProbe): number | null {
+  const damage = weapon.getDamage?.();
+  const attackIntervalMs = weapon.getAttackIntervalMs?.();
+  if (damage === undefined || attackIntervalMs === undefined || attackIntervalMs <= 0) return null;
+
+  const critChance = Math.max(0, Math.min(1, weapon.definition?.critChance ?? 0));
+  const critMultiplier = Math.max(1, weapon.definition?.critMultiplier ?? 1);
+  const expectedDamage = damage * (1 + critChance * (critMultiplier - 1));
+  const magazineSize = Math.max(0, weapon.magazineSize);
+
+  if (magazineSize <= 0) return expectedDamage * (1000 / attackIntervalMs);
+
+  const reloadTimeMs = Math.max(0, weapon.definition?.reloadTimeMs ?? 0);
+  const cycleMs = magazineSize * attackIntervalMs + reloadTimeMs;
+  if (cycleMs <= 0) return null;
+  return expectedDamage * magazineSize * (1000 / cycleMs);
+}
+
 function installBottomHud(scene: Phaser.Scene): void {
   const baseText = findText(scene, (text) => text.startsWith('Base HP'));
   const sourceWeaponText = findText(scene, (text) => text.startsWith('S1 '));
@@ -152,7 +241,9 @@ function installBottomHud(scene: Phaser.Scene): void {
       .setPosition(BOTTOM_PANEL_LEFT + 12, panelTop + 48)
       .setText(weapons.map((weapon, index) => {
         const aa = weapon.canTargetAir ? ' AA' : '';
-        return `S${index + 1} ${weapon.name} L${weapon.level}${aa} · HP ${Math.ceil(weapon.currentHp)}/${weapon.maxHp} · A ${weapon.ammoLabel} · ${weapon.currentState}`;
+        const dps = estimateSustainedDps(weapon);
+        const dpsLabel = dps === null ? '—' : Math.round(dps).toString();
+        return `S${index + 1} ${weapon.name} L${weapon.level}${aa} · DPS≈${dpsLabel} · HP ${Math.ceil(weapon.currentHp)}/${weapon.maxHp} · A ${weapon.ammoLabel} · ${weapon.currentState}`;
       }));
   };
 
@@ -181,9 +272,11 @@ function installCompactDebug(scene: Phaser.Scene): void {
     const airCount = combat.enemies?.filter((enemy) => enemy.domain === 'AIR').length ?? 0;
     const waveKind = combat.waveManager?.isBossWave
       ? 'BOSS'
-      : combat.waveManager?.isReinforcedWave
-        ? 'REINF'
-        : `B${combat.waveManager?.populationBudget ?? 0}`;
+      : combat.waveManager?.isCheckpointWave
+        ? 'GATE'
+        : combat.waveManager?.isReinforcedWave
+          ? 'ELITE'
+          : `B${combat.waveManager?.populationBudget ?? 0}`;
     const devLabel = combat.debugRun
       ? `DEV W${combat.debugStartWave ?? wave}${(combat.debugStressCount ?? 0) > 0 ? ` +${combat.debugStressCount}` : ''}`
       : null;
@@ -204,6 +297,7 @@ function installCompactDebug(scene: Phaser.Scene): void {
 function applyCombatMobileLayout(scene: Phaser.Scene): void {
   hideBattlefieldLabels(scene);
   installPlaytestSpeedControls(scene);
+  installEarlyWaveControl(scene);
   installBottomHud(scene);
   installCompactDebug(scene);
 }

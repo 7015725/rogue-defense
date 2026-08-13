@@ -10,6 +10,12 @@ export type SpawnRequest = { kind: EnemyKind; laneIndex: number };
 type SpawnPlanEntry = SpawnRequest & { atMs: number };
 type RandomSource = () => number;
 
+const EARLY_WAVE_TIME_BONUS_PER_SECOND = 2;
+const EARLY_WAVE_PRESSURE_BONUS_PER_ENEMY = 1;
+const EARLY_WAVE_PRESSURE_BONUS_CAP = 8;
+const EARLY_WAVE_TOTAL_BONUS_CAP = 20;
+const EARLY_WAVE_MIN_REMAINING_MS = 250;
+
 export class WaveManager {
   private waveNumber: number;
   private waveElapsedMs = 0;
@@ -33,12 +39,46 @@ export class WaveManager {
   get isBossWave(): boolean {
     return this.waveNumber >= 20 && this.waveNumber % 10 === 0;
   }
+  get isCheckpointWave(): boolean {
+    return this.isShopCheckpointWave();
+  }
   get isReinforcedWave(): boolean {
     return !this.isBossWave && WaveDirector.getRegularComposition(this.waveNumber).reinforced;
   }
   get shopPending(): boolean { return this.waitingForShop; }
   get populationBudget(): number {
     return this.isBossWave ? 0 : WaveDirector.getRegularComposition(this.waveNumber).populationBudget;
+  }
+  get remainingWaveMs(): number {
+    if (this.isBossWave || this.waitingForShop) return 0;
+    return Math.max(0, WAVE_DURATION_MS - this.waveElapsedMs);
+  }
+  get canAdvanceEarly(): boolean {
+    if (this.waitingForShop || this.isBossWave || this.isShopCheckpointWave()) return false;
+    if (this.spawnPlan.length === 0 || this.spawnedThisWave < this.spawnPlan.length) return false;
+    return this.remainingWaveMs >= EARLY_WAVE_MIN_REMAINING_MS;
+  }
+
+  getEarlyAdvanceBonus(activeEnemyCount: number): number {
+    if (!this.canAdvanceEarly) return 0;
+    const remainingSeconds = Math.max(0, Math.ceil(this.remainingWaveMs / 1000));
+    const timeBonus = remainingSeconds * EARLY_WAVE_TIME_BONUS_PER_SECOND;
+    const pressureBonus = Math.min(
+      EARLY_WAVE_PRESSURE_BONUS_CAP,
+      Math.max(0, Math.floor(activeEnemyCount)) * EARLY_WAVE_PRESSURE_BONUS_PER_ENEMY,
+    );
+    return Math.min(EARLY_WAVE_TOTAL_BONUS_CAP, timeBonus + pressureBonus);
+  }
+
+  advanceEarly(activeEnemyCount: number): number {
+    if (!this.canAdvanceEarly) return 0;
+    const bonus = this.getEarlyAdvanceBonus(activeEnemyCount);
+    this.waveNumber += 1;
+    this.waveElapsedMs = 0;
+    this.bossSpawned = false;
+    this.resetRegularWaveCounters();
+    WaveDirector.setActiveSpawnWave(this.waveNumber);
+    return bonus;
   }
 
   update(deltaMs: number, bossAlive: boolean): SpawnRequest[] {

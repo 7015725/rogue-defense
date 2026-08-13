@@ -26,7 +26,9 @@ export class WaveDirector {
     const normalizedWave = Math.max(1, Math.floor(wave));
     const reinforced = normalizedWave % 5 === 0 && normalizedWave % 10 !== 0;
     const baseBudget = this.getBasePopulationBudget(normalizedWave);
-    const populationBudget = Math.max(7, Math.round(baseBudget * (reinforced ? 1.08 : 1)));
+    // W5/W15/... act as elite pressure checks. Keep them denser than ordinary waves
+    // without turning them into full boss encounters or invalidating the W10 shop cadence.
+    const populationBudget = Math.max(7, Math.round(baseBudget * (reinforced ? 1.12 : 1)));
     const lateWave = Math.max(0, normalizedWave - 40);
 
     const heavyRatio = normalizedWave < 8

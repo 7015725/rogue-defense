@@ -9,6 +9,7 @@
 - [`v0.1-integration.md`](v0.1-integration.md)：Endless Wave、Population Budget、Wave Scaling、W100 难度解锁与 W101+ 延续规则。
 - [`v0.1-playtest-tools.md`](v0.1-playtest-tools.md)：DEV 快捷 Wave、Stress 300、无存档 DEV Settlement、HUD/Status/Projectile 性能优化与移动端触控规则。
 - [`v0.1-validation.md`](v0.1-validation.md)：V0.1 Endless/W100、DEV、移动端、长局回归与性能验证清单。
+- [`open-source-benchmark-v0.1.md`](open-source-benchmark-v0.1.md)：GitHub 开源肉鸽/塔防调研、可借鉴机制、许可证边界，以及提前开波、DPS HUD、W5/W10 节奏的 V0.1 落地决策。
 
 ## 已完成里程碑
 
